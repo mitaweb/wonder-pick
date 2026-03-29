@@ -196,7 +196,7 @@
 
       <!-- Hero card -->
       <div class="member-hero" id="hero-card">
-        <button class="member-logout" onclick="doLogout()">← Đổi SĐT</button>
+        <button class="member-logout" onclick="doLogout()">Đăng xuất</button>
         <div class="member-avatar" id="m-avatar">NA</div>
         <div class="member-name" id="m-name">Nguyễn Văn A</div>
         <div class="member-phone" id="m-phone">0901 234 567</div>
@@ -211,6 +211,28 @@
         <div class="hero-bar-track">
           <div class="hero-bar-fill" id="m-bar"></div>
         </div>
+      </div>
+
+      <!-- Check-in section -->
+      <div style="background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px;box-shadow:var(--shadow)">
+        <div style="font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Check-in vào chơi
+        </div>
+        <div id="ci-alert" class="alert hidden"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px;background:var(--bg2);border-radius:var(--radius-lg)">
+          <span style="font-size:14px;font-weight:500;white-space:nowrap">Số người:</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="counter-btn" onclick="changeCiCount(-1)">−</button>
+            <span id="ci-count" style="font-size:24px;font-weight:700;min-width:40px;text-align:center;color:var(--green-dark)">1</span>
+            <button class="counter-btn" onclick="changeCiCount(1)">+</button>
+          </div>
+          <span id="ci-note" style="font-size:12px;color:var(--text2);margin-left:auto">Trừ 1 lượt</span>
+        </div>
+        <button class="btn btn-primary btn-full" id="ci-btn" onclick="doMemberCheckin()" style="font-size:15px;padding:13px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="ci-btn-text">Check In — trừ 1 buổi</span>
+        </button>
       </div>
 
       <!-- QR card -->
@@ -264,11 +286,22 @@
         </div>
       </div>
 
-      <!-- Kids -->
+      <!-- Kids only option -->
+      <div class="mini-pkg" onclick="selectBuyPkg(this,'kids')" id="buy-kids">
+        <div class="mini-pkg-left">
+          <div class="mini-pkg-name">🎠 Khu vui chơi trẻ em</div>
+          <div class="mini-pkg-desc">Không giới hạn giờ · Chọn số trẻ bên dưới</div>
+        </div>
+        <div>
+          <div class="mini-pkg-price"><?= number_format(PRICE_KIDS) ?>đ/trẻ</div>
+        </div>
+      </div>
+
+      <!-- Kids counter -->
       <div class="kids-inline">
         <div class="kids-inline-left">
-          <div class="title">🎠 Khu vui chơi trẻ em 20K</div>
-          <div class="sub"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Không giới hạn giờ</div>
+          <div class="title">Số trẻ em</div>
+          <div class="sub"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Mua kèm hoặc mua riêng</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
@@ -369,6 +402,7 @@ let kidsCount = 0;
 let pollTimer = null;
 let currentOrderId = null;
 let currentOrderData = null;
+let ciCount = 1;
 
 // ---- LOGIN ----
 function fmtBigPhone(el) {
@@ -420,12 +454,32 @@ async function doLogin() {
     });
     const json = await res.json();
     if (json.error) { showAlert('login-alert', json.error, 'error'); return; }
+    // Lưu đăng nhập vào localStorage
+    localStorage.setItem('wp_member', JSON.stringify({phone, password: pw}));
     currentCustomer = json.data;
     renderMember(json.data, json.checkins||[], json.expired);
   } catch(e) {
     showAlert('login-alert','Lỗi kết nối server','error');
   }
 }
+
+// Tự động đăng nhập từ localStorage
+(async function autoLogin() {
+  const saved = localStorage.getItem('wp_member');
+  if (!saved) return;
+  try {
+    const {phone, password} = JSON.parse(saved);
+    if (!phone || !password) return;
+    const res = await fetch('api/auth.php?action=login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone, password})
+    });
+    const json = await res.json();
+    if (json.error) { localStorage.removeItem('wp_member'); return; }
+    currentCustomer = json.data;
+    renderMember(json.data, json.checkins||[], json.expired);
+  } catch(e) { /* silent fail */ }
+})();
 
 async function doForgot() {
   const email = document.getElementById('forgot-email').value.trim();
@@ -454,6 +508,7 @@ async function doForgot() {
 
 function doLogout() {
   currentCustomer = null;
+  localStorage.removeItem('wp_member');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('member-screen').classList.add('hidden');
   document.getElementById('login-phone').value = '';
@@ -513,14 +568,63 @@ function renderQRMini(phone) {
 function renderHistory(checkins) {
   const el = document.getElementById('m-history');
   if (!checkins.length) { el.innerHTML='<div class="no-history">Chưa có lịch sử check-in</div>'; return; }
-  el.innerHTML = checkins.slice(0,8).map(ci => `
-    <div class="history-item">
+  el.innerHTML = checkins.slice(0,8).map(ci => {
+    const ppl = parseInt(ci.people_count) || 1;
+    const pplBadge = ppl > 1 ? ` <span style="font-size:11px;background:var(--blue);color:white;padding:1px 6px;border-radius:99px">${ppl} người</span>` : '';
+    return `<div class="history-item">
       <div class="history-dot"></div>
       <div class="history-info">
         <span class="history-date">${formatDateTime(ci.checked_in_at)}</span>
-        <span class="history-detail">${ci.sessions_before} → ${ci.sessions_after} buổi</span>
+        <span class="history-detail">${ci.sessions_before} → ${ci.sessions_after} buổi${pplBadge}</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+// ---- MEMBER CHECK-IN ----
+function changeCiCount(d) {
+  const max = currentCustomer ? parseInt(currentCustomer.sessions) : 20;
+  ciCount = Math.max(1, Math.min(max, ciCount + d));
+  document.getElementById('ci-count').textContent = ciCount;
+  document.getElementById('ci-note').textContent = `Trừ ${ciCount} lượt`;
+  document.getElementById('ci-btn-text').textContent = `Check In — trừ ${ciCount} buổi`;
+  const btn = document.getElementById('ci-btn');
+  if (currentCustomer) {
+    const ok = parseInt(currentCustomer.sessions) >= ciCount;
+    btn.disabled = !ok; btn.style.opacity = ok ? '1' : '.45';
+  }
+}
+
+async function doMemberCheckin() {
+  if (!currentCustomer || parseInt(currentCustomer.sessions) < ciCount) return;
+  const btn = document.getElementById('ci-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang xử lý...';
+  try {
+    const res = await fetch(`${API_C}?action=checkin`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone: currentCustomer.phone, count: ciCount})
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('ci-alert', json.error, 'error'); }
+    else {
+      currentCustomer = json.data;
+      const pplText = (json.people_count||1) > 1 ? ` (${json.people_count} người)` : '';
+      showAlert('ci-alert', `✓ Check-in thành công${pplText}! Trừ ${json.sessions_before - json.sessions_after} buổi, còn ${json.sessions_after} buổi.`, 'success');
+      updateSessionsDisplay(json.data, false);
+      // Reset
+      ciCount = 1;
+      document.getElementById('ci-count').textContent = '1';
+      document.getElementById('ci-note').textContent = 'Trừ 1 lượt';
+      document.getElementById('ci-btn-text').textContent = 'Check In — trừ 1 buổi';
+      // Refresh history
+      const r2 = await fetch(`${API_C}?action=get&phone=${currentCustomer.phone}`);
+      const j2 = await r2.json();
+      if (j2.checkins) renderHistory(j2.checkins);
+    }
+  } catch(e) { showAlert('ci-alert','Lỗi kết nối server','error'); }
+  const ok = parseInt(currentCustomer.sessions) >= ciCount;
+  btn.disabled = !ok; btn.style.opacity = ok ? '1' : '.45';
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg> <span id="ci-btn-text">Check In — trừ ${ciCount} buổi</span>`;
 }
 
 // ---- BUY MORE ----
@@ -528,6 +632,7 @@ function selectBuyPkg(el, pkg) {
   document.querySelectorAll('.mini-pkg').forEach(x=>x.classList.remove('selected'));
   el.classList.add('selected');
   selectedBuyPkg = pkg;
+  if (pkg==='kids' && kidsCount===0) { kidsCount=1; document.getElementById('kids-num').textContent=1; }
   updateBuyTotal();
 }
 
@@ -542,6 +647,7 @@ function updateBuyTotal() {
   if (selectedBuyPkg==='pkg_10') { base=PRICES.pkg_10; breakdown='Gói 10+3 = '+PRICES.pkg_10.toLocaleString('vi-VN')+'đ'; }
   else if (selectedBuyPkg==='pkg_30') { base=PRICES.pkg_30; breakdown='Gói 30+10 = '+PRICES.pkg_30.toLocaleString('vi-VN')+'đ'; }
   else if (selectedBuyPkg==='single') { base=SINGLE_PRICE; breakdown='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ'; }
+  else if (selectedBuyPkg==='kids') { base=0; breakdown=''; }
   const kidsAmt = kidsCount*PRICES.kids;
   if (kidsCount>0) breakdown += (breakdown?' + ':'')+kidsCount+' trẻ = '+kidsAmt.toLocaleString('vi-VN')+'đ';
   document.getElementById('buy-total-display').textContent = (base+kidsAmt).toLocaleString('vi-VN')+'đ';

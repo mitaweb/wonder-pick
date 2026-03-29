@@ -167,6 +167,16 @@ switch ($action) {
         jsonResponse(['valid' => (bool)$row]);
         break;
 
+    // POST: Admin đăng nhập
+    // Body: { password }
+    case 'admin_login':
+        $input = getJsonInput();
+        $password = $input['password'] ?? '';
+        if (!$password) jsonResponse(['error' => 'Thiếu mật khẩu'], 400);
+        if ($password !== ADMIN_PASSWORD) jsonResponse(['error' => 'Mật khẩu không đúng'], 401);
+        jsonResponse(['success' => true, 'token' => md5(ADMIN_PASSWORD)]);
+        break;
+
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);
 }

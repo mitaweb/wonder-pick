@@ -24,10 +24,15 @@ function calcOrder(string $pkg, int $kids): array {
             $s = getCurrentSinglePrice();
             $sessions = 1; $amount = $s['price'];
             $label = 'Lẻ 1 buổi (' . $s['slot'] . ')'; break;
+        case 'kids':
+            // Mua riêng khu vui chơi trẻ em
+            $sessions = 0; $amount = 0;
+            $label = 'Khu vui chơi trẻ em'; break;
     }
     $kidsAmount = $kids * PRICE_KIDS;
     $amount += $kidsAmount;
-    if ($kids > 0) $label .= ' + ' . $kids . ' trẻ em (khu vui chơi)';
+    if ($kids > 0 && $pkg !== 'kids') $label .= ' + ' . $kids . ' trẻ em (khu vui chơi)';
+    elseif ($pkg === 'kids') $label = $kids . ' trẻ em — Khu vui chơi';
     return ['sessions' => $sessions, 'amount' => $amount, 'label' => $label, 'kids_amount' => $kidsAmount];
 }
 
@@ -62,13 +67,13 @@ switch ($action) {
         $db->prepare("UPDATE orders SET order_code=? WHERE id=?")->execute([$code, $id]);
 
         // VietQR link API
-        // https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT}-{TEMPLATE}.jpg?amount=X&addInfo=Y&accountName=Z
+        // https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT}-{TEMPLATE}.png?amount=X&addInfo=Y&accountName=Z
         $qrUrl = 'https://img.vietqr.io/image/'
-            . urlencode(BANK_ID) . '-'
-            . urlencode(BANK_ACCOUNT) . '-compact2.jpg'
+            . rawurlencode(BANK_ID) . '-'
+            . rawurlencode(BANK_ACCOUNT) . '-compact2.png'
             . '?amount=' . intval($calc['amount'])
-            . '&addInfo=' . urlencode($code)
-            . '&accountName=' . urlencode(BANK_OWNER);
+            . '&addInfo=' . rawurlencode($code)
+            . '&accountName=' . rawurlencode(BANK_OWNER);
 
         jsonResponse([
             'success'         => true,
