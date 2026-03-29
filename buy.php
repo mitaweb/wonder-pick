@@ -102,11 +102,21 @@
         </div>
       </div>
 
-      <!-- Trẻ em -->
+      <!-- Kids only -->
+      <div class="pkg-row" style="grid-template-columns:1fr">
+        <div class="pkg-card" onclick="selectPkg(this,'kids')" id="opt-kids">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div class="pkg-name">🎠 Khu vui chơi trẻ em</div><div class="pkg-desc">Không giới hạn giờ · Chọn số trẻ bên dưới</div></div>
+            <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(PRICE_KIDS) ?>đ/trẻ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trẻ em counter -->
       <div class="kids-row">
         <div>
-          <div style="font-weight:500;font-size:14px">🎠 Khu vui chơi trẻ em 20K</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Không giới hạn giờ</div>
+          <div style="font-weight:500;font-size:14px">Số trẻ em</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Mua kèm hoặc mua riêng</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
@@ -216,14 +226,20 @@ async function lookupName() {
   } catch(e){}
 }
 
-function selectPkg(el,type){document.querySelectorAll('.pkg-card').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');selectedPkg=type;updateTotal();}
 function changeKids(d){kidsCount=Math.max(0,kidsCount+d);document.getElementById('kids-count').textContent=kidsCount;updateTotal();}
 
+function selectPkg(el,type){
+  document.querySelectorAll('.pkg-card').forEach(x=>x.classList.remove('selected'));
+  el.classList.add('selected');selectedPkg=type;
+  if(type==='kids' && kidsCount===0){kidsCount=1;document.getElementById('kids-count').textContent=1;}
+  updateTotal();
+}
 function updateTotal(){
   let base=0,bd='';
   if(selectedPkg==='pkg_10'){base=PRICES.pkg_10;bd='Gói 10+3 = '+PRICES.pkg_10.toLocaleString('vi-VN')+'đ';}
   else if(selectedPkg==='pkg_30'){base=PRICES.pkg_30;bd='Gói 30+10 = '+PRICES.pkg_30.toLocaleString('vi-VN')+'đ';}
   else if(selectedPkg==='single'){base=SINGLE_PRICE;bd='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ';}
+  else if(selectedPkg==='kids'){base=0;bd='';}
   const ka=kidsCount*PRICES.kids;
   if(kidsCount>0) bd+=(bd?' + ':'')+kidsCount+' trẻ = '+ka.toLocaleString('vi-VN')+'đ';
   document.getElementById('total-display').textContent=(base+ka).toLocaleString('vi-VN')+'đ';
@@ -235,6 +251,7 @@ async function proceedToPayment() {
   const phone = document.getElementById('buy-phone').value.replace(/\D/g,'');
   const name  = document.getElementById('buy-name').value.trim();
   if (phone.length<9) { showAlert('reg-alert','Vui lòng nhập số điện thoại','warn'); return; }
+  if (selectedPkg==='kids' && kidsCount<=0) { showAlert('reg-alert','Vui lòng chọn số trẻ em','warn'); return; }
   hideAlert('reg-alert');
   try {
     const res = await fetch('api/orders.php?action=create', {

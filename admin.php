@@ -327,11 +327,21 @@ let addTargetPhone = null, addSessions = 13, addPkg = 'pkg_10';
 let currentQROrderId = null;
 let autoRefreshTimer = null;
 
-function adminLogin() {
+async function adminLogin() {
   const pw = document.getElementById('admin-pw').value;
   if (!pw) { showAlert('login-alert','Nhập mật khẩu','warn'); return; }
-  adminToken = md5(pw);
-  loadDashboard();
+  try {
+    const res = await fetch('api/auth.php?action=admin_login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: pw})
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('login-alert', json.error, 'error'); return; }
+    adminToken = json.token;
+    loadDashboard();
+  } catch(e) {
+    showAlert('login-alert','Lỗi kết nối server','error');
+  }
 }
 
 function adminLogout() {
@@ -730,7 +740,6 @@ function formatDateShort(d) { const dt = new Date(d); return dt.toLocaleDateStri
 
 // ---- UTILS ----
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function md5(s){let h=0;for(let i=0;i<s.length;i++)h=(Math.imul(31,h)+s.charCodeAt(i))|0;return Math.abs(h).toString(16).padStart(8,'0');}
 
 function formatDateTime(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});}
 </script>
