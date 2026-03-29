@@ -80,32 +80,6 @@ switch ($action) {
         }
         break;
 
-    // GET: Lấy cấu hình Zalo OA
-    case 'get_zalo':
-        requireAdmin();
-        $db = getDB();
-        $rows = $db->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'zalo_%'")->fetchAll();
-        $settings = array_column($rows, 'setting_value', 'setting_key');
-        $settings['zalo_token_set'] = !empty($settings['zalo_oa_token']);
-        $settings['zalo_oa_token'] = '';
-        jsonResponse(['success' => true, 'data' => $settings]);
-        break;
-
-    // POST: Lưu cấu hình Zalo OA
-    case 'save_zalo':
-        requireAdmin();
-        $input = getJsonInput();
-        $db = getDB();
-        $stmt = $db->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
-        if (isset($input['zalo_enabled'])) {
-            $stmt->execute(['zalo_enabled', $input['zalo_enabled']]);
-        }
-        if (!empty($input['zalo_oa_token'])) {
-            $stmt->execute(['zalo_oa_token', $input['zalo_oa_token']]);
-        }
-        jsonResponse(['success' => true, 'message' => 'Đã lưu cấu hình Zalo OA']);
-        break;
-
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);
 }

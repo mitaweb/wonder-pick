@@ -198,46 +198,6 @@ function smtpRead($sock): string {
     return $resp;
 }
 
-// ---- Gửi thông báo qua Zalo OA ----
-function sendZaloNotification(string $accessToken, string $phone, string $userName, string $message): bool {
-    // Zalo OA API v3 - gửi tin nhắn tư vấn (consultation message)
-    // Cần user đã follow OA và đồng ý nhận tin
-    $url = 'https://openapi.zalo.me/v3.0/oa/message/cs';
-
-    $data = [
-        'recipient' => ['user_id' => $phone],
-        'message' => [
-            'text' => $message
-        ]
-    ];
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'access_token: ' . $accessToken
-        ],
-        CURLOPT_POSTFIELDS => json_encode($data),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 10,
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response) {
-        $result = json_decode($response, true);
-        if (($result['error'] ?? -1) != 0) {
-            error_log('[WP Zalo] Send failed: ' . $response);
-            return false;
-        }
-        return true;
-    }
-    error_log('[WP Zalo] Connection failed, HTTP ' . $httpCode);
-    return false;
-}
-
 // ---- Template email ----
 function emailTemplate(string $title, string $body): string {
     return <<<HTML

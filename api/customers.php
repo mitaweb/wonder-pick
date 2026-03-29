@@ -73,19 +73,25 @@ switch ($action) {
             $updated->execute([$phone]);
             $updatedData = $updated->fetch();
 
-            // Gửi thông báo Zalo nếu đã cấu hình
-            $zaloToken = getSetting('zalo_oa_token', '');
-            $zaloEnabled = getSetting('zalo_enabled', '0');
-            if ($zaloToken && $zaloEnabled === '1') {
-                $zaloPhone = $phone;
-                // Chuyển 0xxx → 84xxx cho Zalo API
-                if (strpos($zaloPhone, '0') === 0) $zaloPhone = '84' . substr($zaloPhone, 1);
-                $zaloMsg = "Check-in thành công!\n"
-                    . ($count > 1 ? "Số người: {$count}\n" : "")
-                    . "Trừ: {$count} lượt\n"
-                    . "Còn lại: {$after} lượt\n"
-                    . "Chúc bạn chơi vui vẻ tại Wonder Pickleball!";
-                sendZaloNotification($zaloToken, $zaloPhone, $customer['name'], $zaloMsg);
+            // Gửi email thông báo check-in nếu có email
+            $custEmail = $updatedData['email'] ?? '';
+            $smtpEnabled = getSetting('smtp_enabled', '0');
+            if ($custEmail && $smtpEnabled === '1') {
+                $pplText = $count > 1 ? "<tr><td style='padding:6px 0;color:#666'>Số người</td><td style='padding:6px 0;font-weight:600'>{$count} người</td></tr>" : "";
+                $dateStr = date('d/m/Y H:i');
+                $html = emailTemplate(
+                    'Check-in thành công! ✓',
+                    "<p>Xin chào <strong>{$updatedData['name']}</strong>,</p>
+                    <p>Bạn vừa check-in tại <strong>Wonder Pickleball</strong>:</p>
+                    <table style='width:100%;border-collapse:collapse;margin:16px 0'>
+                        {$pplText}
+                        <tr><td style='padding:6px 0;color:#666'>Lượt đã trừ</td><td style='padding:6px 0;font-weight:600'>{$count} lượt</td></tr>
+                        <tr><td style='padding:6px 0;color:#666'>Lượt còn lại</td><td style='padding:6px 0;font-weight:600;color:#1D9E75;font-size:18px'>{$after} lượt</td></tr>
+                        <tr><td style='padding:6px 0;color:#666'>Thời gian</td><td style='padding:6px 0'>{$dateStr}</td></tr>
+                    </table>
+                    <p>Chúc bạn chơi vui vẻ! 🏓</p>"
+                );
+                sendMail($custEmail, $updatedData['name'], '[Wonder Pickleball] Check-in thành công', $html);
             }
 
             jsonResponse(['success' => true, 'data' => $updatedData, 'sessions_before' => $before, 'sessions_after' => $after, 'people_count' => $count]);

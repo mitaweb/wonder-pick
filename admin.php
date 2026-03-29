@@ -121,8 +121,7 @@
         </button>
         <button class="admin-tab" id="tab-report" onclick="switchTab('report')">📊 Báo cáo</button>
         <button class="admin-tab" id="tab-members" onclick="switchTab('members')">👥 Thành viên</button>
-        <button class="admin-tab" id="tab-zalo" onclick="switchTab('zalo')">💬 Zalo Bot</button>
-        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email</button>
+        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email SMTP</button>
       </div>
 
       <!-- TAB: ORDERS -->
@@ -204,48 +203,6 @@
             <div id="rpt-low-list" class="report-list"></div>
             <div id="rpt-low-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Không có hội viên nào</div>
           </div>
-        </div>
-      </div>
-
-      <!-- TAB: ZALO -->
-      <div class="tab-panel" id="panel-zalo">
-        <div class="table-card" style="margin-bottom:0">
-          <div style="margin-bottom:16px">
-            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">Cấu hình Zalo OA Bot</h3>
-            <div style="font-size:12px;color:var(--text2)">Gửi thông báo check-in và lượt chơi còn lại cho hội viên qua Zalo</div>
-          </div>
-          <div id="zalo-alert" class="alert hidden"></div>
-          <div class="form-group">
-            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Trạng thái</label>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-              <input type="checkbox" id="zalo-enabled" style="width:18px;height:18px;accent-color:var(--green)">
-              <span style="font-size:14px">Bật thông báo Zalo</span>
-            </label>
-          </div>
-          <div class="form-group">
-            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">
-              Access Token (Zalo OA)
-              <a href="https://developers.zalo.me/docs/official-account" target="_blank" style="color:var(--green);font-weight:400;margin-left:6px;font-size:11px">Hướng dẫn →</a>
-            </label>
-            <div class="pw-wrap">
-              <input type="password" id="zalo-token" class="form-input" placeholder="Dán Access Token từ Zalo Developers...">
-              <button class="pw-toggle" onclick="togglePw('zalo-token',this)">👁</button>
-            </div>
-            <div id="zalo-token-hint" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
-          </div>
-          <div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:var(--radius);padding:12px;font-size:12px;color:#185FA5;margin-bottom:14px;line-height:1.8">
-            <strong>Hướng dẫn cấu hình Zalo OA:</strong><br>
-            1. Tạo Zalo Official Account tại <a href="https://oa.zalo.me" target="_blank" style="color:#185FA5">oa.zalo.me</a><br>
-            2. Đăng ký app tại <a href="https://developers.zalo.me" target="_blank" style="color:#185FA5">developers.zalo.me</a> → liên kết OA<br>
-            3. Lấy Access Token (OA) → dán vào ô trên<br>
-            4. Người dùng cần <strong>follow OA</strong> để nhận được tin nhắn<br>
-            <br>
-            <strong>Lưu ý:</strong> Khi hội viên check-in, hệ thống sẽ tự động gửi thông báo gồm:<br>
-            • Số người vào chơi<br>
-            • Số lượt đã trừ<br>
-            • Số lượt còn lại trên thẻ
-          </div>
-          <button class="btn btn-primary btn-full" onclick="saveZalo()">Lưu cấu hình Zalo</button>
         </div>
       </div>
 
@@ -453,7 +410,6 @@ function switchTab(name) {
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='orders') loadOrders();
   if (name==='report') loadReport();
-  if (name==='zalo') loadZaloSettings();
 }
 
 // ---- ORDERS ----
@@ -771,41 +727,6 @@ async function loadReport() {
 
 function formatMoney(n) { return parseInt(n).toLocaleString('vi-VN'); }
 function formatDateShort(d) { const dt = new Date(d); return dt.toLocaleDateString('vi-VN', {weekday:'short', day:'2-digit', month:'2-digit'}); }
-
-// ---- ZALO ----
-async function loadZaloSettings() {
-  try {
-    const res = await fetch(`${API_SET}?action=get_zalo&admin_token=${adminToken}`);
-    const json = await res.json();
-    if (json.data) {
-      document.getElementById('zalo-enabled').checked = json.data.zalo_enabled === '1';
-      if (json.data.zalo_token_set) {
-        document.getElementById('zalo-token-hint').textContent = '✓ Access Token đã được lưu. Điền lại nếu muốn thay đổi.';
-      }
-    }
-  } catch(e) {}
-}
-
-async function saveZalo() {
-  const data = {
-    zalo_enabled: document.getElementById('zalo-enabled').checked ? '1' : '0',
-    zalo_oa_token: document.getElementById('zalo-token').value,
-    admin_token: adminToken
-  };
-  try {
-    const res = await fetch(`${API_SET}?action=save_zalo`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(data)
-    });
-    const json = await res.json();
-    if (json.error) showAlert('zalo-alert', json.error, 'error');
-    else {
-      showAlert('zalo-alert', '✓ Đã lưu cấu hình Zalo OA', 'success');
-      document.getElementById('zalo-token').value = '';
-      loadZaloSettings();
-    }
-  } catch(e) { showAlert('zalo-alert', 'Lỗi kết nối', 'error'); }
-}
 
 // ---- UTILS ----
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
