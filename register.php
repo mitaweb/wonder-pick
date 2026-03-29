@@ -23,7 +23,16 @@
       <p class="subtitle">Tạo tài khoản để quản lý thẻ tập Wonder Pickleball</p>
     </div>
 
-    <div class="form-card">
+    <!-- Already logged in -->
+    <div id="already-logged" class="form-card hidden" style="text-align:center">
+      <div style="font-size:48px;margin-bottom:14px">👋</div>
+      <h3 style="font-size:18px;font-weight:600;margin-bottom:6px" id="logged-name">Bạn đã đăng nhập</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px" id="logged-phone"></p>
+      <a href="member.php" class="btn btn-primary btn-full" style="margin-bottom:10px">Đi đến trang Thành viên →</a>
+      <button class="btn btn-ghost btn-full" onclick="memberLogout()">Đăng xuất</button>
+    </div>
+
+    <div class="form-card" id="reg-form-card">
       <div id="reg-alert" class="alert hidden"></div>
 
       <div class="form-group">
@@ -69,6 +78,32 @@
 <script>
 function fmtPhone(el){let d=el.value.replace(/\D/g,'').slice(0,10);if(d.length>7)el.value=d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7);else if(d.length>4)el.value=d.slice(0,4)+' '+d.slice(4);else el.value=d;}
 function togglePw(id,btn){const el=document.getElementById(id);if(el.type==='password'){el.type='text';btn.textContent='🙈';}else{el.type='password';btn.textContent='👁';}}
+
+function memberLogout() {
+  localStorage.removeItem('wp_member');
+  document.getElementById('already-logged').classList.add('hidden');
+  document.getElementById('reg-form-card').classList.remove('hidden');
+}
+
+(async function checkLoggedIn() {
+  const saved = localStorage.getItem('wp_member');
+  if (!saved) return;
+  try {
+    const {phone, password} = JSON.parse(saved);
+    const res = await fetch('api/auth.php?action=login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone, password})
+    });
+    const json = await res.json();
+    if (json.error) { localStorage.removeItem('wp_member'); return; }
+    const d = json.data;
+    const ph = d.phone.replace(/\D/g,'');
+    document.getElementById('logged-name').textContent = 'Xin chào, ' + d.name;
+    document.getElementById('logged-phone').textContent = 'SĐT: ' + ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+    document.getElementById('already-logged').classList.remove('hidden');
+    document.getElementById('reg-form-card').classList.add('hidden');
+  } catch(e) {}
+})();
 
 async function doRegister() {
   const name  = document.getElementById('reg-name').value.trim();

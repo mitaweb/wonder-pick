@@ -66,14 +66,14 @@ switch ($action) {
         $code = ORDER_PREFIX . str_pad($id, 4, '0', STR_PAD_LEFT); // WP0001
         $db->prepare("UPDATE orders SET order_code=? WHERE id=?")->execute([$code, $id]);
 
-        // VietQR link API
-        // https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT}-{TEMPLATE}.png?amount=X&addInfo=Y&accountName=Z
+        // VietQR link API (đọc từ DB, fallback config)
+        $bank = getBankConfig();
         $qrUrl = 'https://img.vietqr.io/image/'
-            . rawurlencode(BANK_ID) . '-'
-            . rawurlencode(BANK_ACCOUNT) . '-compact2.png'
+            . rawurlencode($bank['bank_id']) . '-'
+            . rawurlencode($bank['bank_account']) . '-compact2.png'
             . '?amount=' . intval($calc['amount'])
             . '&addInfo=' . rawurlencode($code)
-            . '&accountName=' . rawurlencode(BANK_OWNER);
+            . '&accountName=' . rawurlencode($bank['bank_owner']);
 
         jsonResponse([
             'success'         => true,
@@ -84,10 +84,10 @@ switch ($action) {
             'sessions_to_add' => $calc['sessions'],
             'kids_count'      => $kids,
             'qr_url'          => $qrUrl,
-            'bank_id'         => BANK_ID,
-            'bank_account'    => BANK_ACCOUNT,
-            'bank_owner'      => BANK_OWNER,
-            'bank_name'       => BANK_NAME,
+            'bank_id'         => $bank['bank_id'],
+            'bank_account'    => $bank['bank_account'],
+            'bank_owner'      => $bank['bank_owner'],
+            'bank_name'       => $bank['bank_name'],
         ]);
         break;
 

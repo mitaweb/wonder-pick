@@ -151,48 +151,62 @@ switch ($action) {
         $db = getDB();
         $today = date('Y-m-d');
 
-        // 1. Số người đến chơi hôm nay (tổng people_count hoặc count checkins)
-        $ciToday = $db->prepare("SELECT COUNT(*) as total_checkins, COALESCE(SUM(people_count),COUNT(*)) as total_people FROM checkins WHERE DATE(checked_in_at) = ?");
-        $ciToday->execute([$today]);
-        $checkinStats = $ciToday->fetch();
+        // Date range params (optional)
+        $dateFrom = $_GET['date_from'] ?? $today;
+        $dateTo   = $_GET['date_to'] ?? $today;
+        // Validate date format
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = $today;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = $today;
 
-        // Danh sách check-in hôm nay
-        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) = ? ORDER BY c.checked_in_at DESC");
-        $ciList->execute([$today]);
-        $todayCheckins = $ciList->fetchAll();
+        // 1. Check-in trong khoảng ngày
+        $ciStats = $db->prepare("SELECT COUNT(*) as total_checkins, COALESCE(SUM(people_count),COUNT(*)) as total_people FROM checkins WHERE DATE(checked_in_at) BETWEEN ? AND ?");
+        $ciStats->execute([$dateFrom, $dateTo]);
+        $checkinStats = $ciStats->fetch();
 
-        // 2. Hội viên còn dưới 5 buổi tập (có buổi > 0 và <= 5)
+        // Danh sách check-in trong khoảng ngày
+        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
+        $ciList->execute([$dateFrom, $dateTo]);
+        $dateCheckins = $ciList->fetchAll();
+
+        // 2. Hội viên còn dưới 5 buổi tập
         $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 ORDER BY sessions ASC")->fetchAll();
 
-        // 3. Doanh thu hôm nay (tổng đơn Paid hôm nay)
-        $revToday = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) = ?");
-        $revToday->execute([$today]);
-        $revenueStats = $revToday->fetch();
+        // 3. Doanh thu trong khoảng ngày
+        $revRange = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ?");
+        $revRange->execute([$dateFrom, $dateTo]);
+        $revenueStats = $revRange->fetch();
 
-        // Doanh thu 7 ngày gần nhất
-        $rev7 = $db->prepare("SELECT DATE(paid_at) as day, SUM(amount) as revenue, COUNT(*) as orders FROM orders WHERE payment_status='Paid' AND paid_at >= DATE_SUB(?, INTERVAL 7 DAY) GROUP BY DATE(paid_at) ORDER BY day DESC");
-        $rev7->execute([$today]);
-        $revenue7days = $rev7->fetchAll();
+        // Doanh thu theo ngày trong khoảng
+        $revDays = $db->prepare("SELECT DATE(paid_at) as day, SUM(amount) as revenue, COUNT(*) as orders FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY day DESC");
+        $revDays->execute([$dateFrom, $dateTo]);
+        $revenueDays = $revDays->fetchAll();
 
-        // Đơn hàng hôm nay
-        $ordToday = $db->prepare("SELECT * FROM orders WHERE DATE(created_at) = ? ORDER BY created_at DESC");
-        $ordToday->execute([$today]);
-        $todayOrders = $ordToday->fetchAll();
+        // Doanh thu tháng này
+        $monthStart = date('Y-m-01');
+        $revMonth = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) >= ?");
+        $revMonth->execute([$monthStart]);
+        $revenueMonth = $revMonth->fetch();
 
         jsonResponse([
             'success' => true,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
             'checkin_stats' => [
                 'total_checkins' => (int)$checkinStats['total_checkins'],
                 'total_people' => (int)$checkinStats['total_people'],
             ],
-            'today_checkins' => $todayCheckins,
+            'date_checkins' => $dateCheckins,
             'low_session_members' => $lowMembers,
             'revenue' => [
-                'today' => (float)$revenueStats['revenue'],
+                'total' => (float)$revenueStats['revenue'],
                 'paid_count' => (int)$revenueStats['paid_count'],
             ],
-            'revenue_7days' => $revenue7days,
-            'today_orders' => $todayOrders,
+            'revenue_days' => $revenueDays,
+            'revenue_month' => [
+                'total' => (float)$revenueMonth['revenue'],
+                'paid_count' => (int)$revenueMonth['paid_count'],
+                'month_label' => date('m/Y'),
+            ],
         ]);
         break;
 
