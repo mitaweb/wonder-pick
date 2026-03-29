@@ -60,10 +60,20 @@
         <span class="session-bar-label" id="session-bar-label"></span>
       </div>
 
+      <div class="people-count-row" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px;background:var(--bg2);border-radius:var(--radius-lg)">
+        <span style="font-size:14px;font-weight:500;white-space:nowrap">Số người vào chơi:</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-outline" style="width:36px;height:36px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="changePeopleCount(-1)">−</button>
+          <span id="people-count" style="font-size:24px;font-weight:700;min-width:40px;text-align:center;color:var(--green-dark)">1</span>
+          <button class="btn btn-outline" style="width:36px;height:36px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="changePeopleCount(1)">+</button>
+        </div>
+        <span id="people-note" style="font-size:12px;color:var(--text2);margin-left:auto">Trừ 1 lượt</span>
+      </div>
+
       <div class="action-row">
         <button class="btn btn-checkin" id="checkin-btn" onclick="doCheckin()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Check In — trừ 1 buổi
+          <span id="checkin-btn-text">Check In — trừ 1 buổi</span>
         </button>
         <button class="btn btn-ghost" onclick="showQRModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
@@ -100,6 +110,21 @@
 <script>
 const API_BASE = 'api/customers.php';
 let currentCustomer = null;
+let peopleCount = 1;
+
+function changePeopleCount(delta) {
+  const maxPeople = currentCustomer ? parseInt(currentCustomer.sessions) : 20;
+  peopleCount = Math.max(1, Math.min(maxPeople, peopleCount + delta));
+  document.getElementById('people-count').textContent = peopleCount;
+  document.getElementById('people-note').textContent = `Trừ ${peopleCount} lượt`;
+  document.getElementById('checkin-btn-text').textContent = `Check In — trừ ${peopleCount} buổi`;
+  const btn = document.getElementById('checkin-btn');
+  if (currentCustomer) {
+    const canCheckin = parseInt(currentCustomer.sessions) >= peopleCount;
+    btn.disabled = !canCheckin;
+    btn.style.opacity = canCheckin ? '1' : '.45';
+  }
+}
 
 document.getElementById('phone-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') searchCustomer();
@@ -141,6 +166,11 @@ function renderCustomer(c, checkins) {
   document.getElementById('cust-name').textContent = c.name;
   document.getElementById('cust-phone').textContent = formatPhoneDisplay(c.phone);
   document.getElementById('cust-joined').textContent = 'Tham gia: ' + formatDate(c.created_at);
+  // Reset people count
+  peopleCount = 1;
+  document.getElementById('people-count').textContent = '1';
+  document.getElementById('people-note').textContent = 'Trừ 1 lượt';
+  document.getElementById('checkin-btn-text').textContent = 'Check In — trừ 1 buổi';
   updateSessionDisplay(c);
   renderHistory(checkins);
   hideAlert('checkin-alert');
@@ -163,7 +193,7 @@ function updateSessionDisplay(c) {
 }
 
 async function doCheckin() {
-  if (!currentCustomer || parseInt(currentCustomer.sessions) <= 0) return;
+  if (!currentCustomer || parseInt(currentCustomer.sessions) < peopleCount) return;
   const btn = document.getElementById('checkin-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Đang xử lý...';
@@ -172,14 +202,19 @@ async function doCheckin() {
     const res = await fetch(`${API_BASE}?action=checkin`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({phone: currentCustomer.phone})
+      body: JSON.stringify({phone: currentCustomer.phone, count: peopleCount})
     });
     const json = await res.json();
     if (json.error) { showAlert('checkin-alert', json.error, 'error'); }
     else {
       currentCustomer = json.data;
       updateSessionDisplay(json.data);
-      showAlert('checkin-alert', `✓ Check-in thành công! Còn ${json.sessions_after} buổi.`, 'success');
+      const pplText = (json.people_count||1) > 1 ? ` (${json.people_count} người)` : '';
+      showAlert('checkin-alert', `✓ Check-in thành công${pplText}! Trừ ${json.sessions_before - json.sessions_after} buổi, còn ${json.sessions_after} buổi.`, 'success');
+      // Reset people count
+      peopleCount = 1;
+      document.getElementById('people-count').textContent = '1';
+      document.getElementById('people-note').textContent = 'Trừ 1 lượt';
       // Refresh history
       const res2 = await fetch(`${API_BASE}?action=get&phone=${currentCustomer.phone}`);
       const json2 = await res2.json();
@@ -188,21 +223,26 @@ async function doCheckin() {
   } catch(e) {
     showAlert('checkin-alert', 'Lỗi kết nối server', 'error');
   }
-  btn.disabled = parseInt(currentCustomer.sessions) <= 0;
-  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Check In — trừ 1 buổi';
+  const canCheckin = parseInt(currentCustomer.sessions) >= peopleCount;
+  btn.disabled = !canCheckin;
+  btn.style.opacity = canCheckin ? '1' : '.45';
+  btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <span id="checkin-btn-text">Check In — trừ ${peopleCount} buổi</span>`;
 }
 
 function renderHistory(checkins) {
   const el = document.getElementById('history-list');
   if (!checkins.length) { el.innerHTML = '<div class="no-history">Chưa có lịch sử</div>'; return; }
-  el.innerHTML = checkins.slice(0,8).map(ci => `
-    <div class="history-item">
+  el.innerHTML = checkins.slice(0,8).map(ci => {
+    const ppl = parseInt(ci.people_count) || 1;
+    const pplBadge = ppl > 1 ? ` <span style="font-size:11px;background:var(--blue);color:white;padding:1px 6px;border-radius:99px">${ppl} người</span>` : '';
+    return `<div class="history-item">
       <div class="history-dot"></div>
       <div class="history-info">
         <span class="history-date">${formatDateTime(ci.checked_in_at)}</span>
-        <span class="history-detail">${ci.sessions_before} → ${ci.sessions_after} buổi</span>
+        <span class="history-detail">${ci.sessions_before} → ${ci.sessions_after} buổi${pplBadge}</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function handleQRInput(el) {
