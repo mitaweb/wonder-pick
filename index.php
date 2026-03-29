@@ -1,4 +1,12 @@
-<?php require_once __DIR__ . '/includes/config.php'; ?>
+<?php
+require_once __DIR__ . '/includes/config.php';
+// Load banners from DB
+$dbBanners = [];
+try {
+    $dbBanners = getDB()->query("SELECT id, image_path, link_url FROM banners ORDER BY created_at DESC")->fetchAll();
+} catch (\Throwable $e) { $dbBanners = []; }
+$uploadBase = rtrim(APP_URL, '/') . '/uploads/banners/';
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -133,6 +141,7 @@
     <div class="banner-section">
       <div class="banner-title">🏆 Giải đấu & Sự kiện</div>
 
+      <?php if (empty($dbBanners)): ?>
       <div class="banner-card">
         <div class="banner-img">
           <div class="banner-placeholder">
@@ -142,24 +151,21 @@
           </div>
         </div>
         <div class="banner-body">
-          <h3>Wonder Open 2026 — Mùa Xuân</h3>
-          <p>Giải đấu Pickleball hàng tháng dành cho mọi trình độ. Đăng ký tham gia để có cơ hội nhận giải thưởng hấp dẫn và giao lưu cùng cộng đồng!</p>
+          <h3>Chào mừng đến Wonder Pickleball!</h3>
+          <p>Đăng ký thành viên, mua gói tập và check-in dễ dàng. Liên hệ admin để cập nhật thông tin sự kiện và giải đấu.</p>
         </div>
       </div>
-
-      <div class="banner-card">
-        <div class="banner-img" style="background:linear-gradient(135deg,#1a365d,#378ADD)">
-          <div class="banner-placeholder">
-            <div class="bp-icon">🎓</div>
-            <div class="bp-title">Lớp học Pickleball</div>
-            <div class="bp-sub">Cho người mới bắt đầu</div>
-          </div>
-        </div>
-        <div class="banner-body">
-          <h3>Lớp học Pickleball cơ bản</h3>
-          <p>Dành cho người mới! Học kỹ thuật cơ bản từ huấn luyện viên chuyên nghiệp. Mỗi tuần 2 buổi, miễn phí cho hội viên gói 30 buổi.</p>
-        </div>
-      </div>
+      <?php else: ?>
+      <?php foreach ($dbBanners as $b): ?>
+      <?php
+        $imgUrl = htmlspecialchars($uploadBase . basename($b['image_path']));
+        $linkUrl = $b['link_url'] ? htmlspecialchars($b['link_url']) : '';
+      ?>
+      <?php if ($linkUrl): ?><a href="<?= $linkUrl ?>" target="_blank" class="banner-card" style="text-decoration:none;color:inherit;display:block"><?php else: ?><div class="banner-card"><?php endif; ?>
+        <img src="<?= $imgUrl ?>" alt="Banner" class="banner-img" style="display:block;height:200px;object-fit:cover" onerror="this.style.display='none'">
+        <?php if ($linkUrl): ?></a><?php else: ?></div><?php endif; ?>
+      <?php endforeach; ?>
+      <?php endif; ?>
     </div>
 
     <!-- Quick Pricing -->

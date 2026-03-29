@@ -30,11 +30,15 @@
       </div>
       <div class="qr-row">
         <span class="qr-hint">hoặc</span>
-        <button class="btn btn-ghost" onclick="document.getElementById('qr-input').focus()">
+        <button class="btn btn-ghost" id="scan-btn" onclick="startQRScan()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>
-          Nhập mã QR
+          Quét mã QR
         </button>
-        <input type="text" id="qr-input" class="qr-hidden-input" placeholder="WP-0901234567" oninput="handleQRInput(this)">
+      </div>
+      <!-- Camera QR Scanner -->
+      <div id="qr-scanner-wrap" style="display:none;margin-top:12px">
+        <div id="qr-reader" style="width:100%;border-radius:var(--radius-lg);overflow:hidden"></div>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px;font-size:13px" onclick="stopQRScan()">✕ Đóng camera</button>
       </div>
       <div id="search-alert" class="alert hidden"></div>
     </div>
@@ -106,6 +110,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
 const API_BASE = 'api/customers.php';
@@ -245,13 +250,55 @@ function renderHistory(checkins) {
   }).join('');
 }
 
-function handleQRInput(el) {
-  const v = el.value.trim();
-  if (v.startsWith('WP-') && v.length > 5) {
-    const phone = v.replace('WP-','');
+let html5QrScanner = null;
+
+function startQRScan() {
+  const wrap = document.getElementById('qr-scanner-wrap');
+  wrap.style.display = 'block';
+  document.getElementById('scan-btn').disabled = true;
+  html5QrScanner = new Html5Qrcode('qr-reader');
+  Html5Qrcode.getCameras().then(cameras => {
+    if (!cameras || cameras.length === 0) {
+      showAlert('search-alert','Không tìm thấy camera trên thiết bị này','error');
+      stopQRScan(); return;
+    }
+    // Ưu tiên camera sau (back camera) trên mobile
+    const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length-1];
+    html5QrScanner.start(
+      cam.id,
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => { handleQRResult(decodedText); },
+      () => {}
+    ).catch(err => {
+      showAlert('search-alert','Không thể mở camera: ' + err,'error');
+      stopQRScan();
+    });
+  }).catch(() => {
+    showAlert('search-alert','Trình duyệt không hỗ trợ camera hoặc chưa cấp quyền','error');
+    stopQRScan();
+  });
+}
+
+function stopQRScan() {
+  if (html5QrScanner) {
+    html5QrScanner.stop().catch(()=>{});
+    html5QrScanner = null;
+  }
+  document.getElementById('qr-scanner-wrap').style.display = 'none';
+  document.getElementById('scan-btn').disabled = false;
+}
+
+function handleQRResult(text) {
+  stopQRScan();
+  const v = text.trim();
+  let phone = '';
+  if (v.startsWith('WP-')) phone = v.replace('WP-','');
+  else phone = v.replace(/\D/g,'');
+  if (phone.length >= 9) {
     document.getElementById('phone-input').value = formatPhoneDisplay(phone);
-    el.value = '';
     searchCustomer();
+  } else {
+    showAlert('search-alert','Mã QR không hợp lệ: ' + text,'error');
   }
 }
 

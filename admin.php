@@ -67,6 +67,23 @@
 .rev-day:last-child{border-bottom:none}
 .rev-day .rd-date{color:var(--text2)}
 .rev-day .rd-amount{font-weight:600;color:var(--green-dark)}
+
+/* Pagination */
+.pager{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text2)}
+.pager-btns{display:flex;gap:6px}
+.pager-btn{padding:4px 12px;border:0.5px solid var(--border2);border-radius:99px;background:transparent;font-size:12px;cursor:pointer;font-family:inherit;color:var(--text2)}
+.pager-btn:disabled{opacity:.35;cursor:default}
+.pager-btn.active-pg{background:var(--green);color:white;border-color:var(--green)}
+
+/* Banner management */
+.banner-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.banner-thumb{width:80px;height:50px;border-radius:var(--radius);object-fit:cover;border:0.5px solid var(--border);flex-shrink:0;background:var(--bg2)}
+.banner-info{flex:1;min-width:0}
+.banner-link{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.banner-actions{display:flex;gap:6px;flex-shrink:0}
+.upload-zone{border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:24px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:14px}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:var(--green-light)}
+.upload-zone input{display:none}
 </style>
 </head>
 <body>
@@ -121,6 +138,7 @@
         </button>
         <button class="admin-tab" id="tab-report" onclick="switchTab('report')">📊 Báo cáo</button>
         <button class="admin-tab" id="tab-members" onclick="switchTab('members')">👥 Thành viên</button>
+        <button class="admin-tab" id="tab-banners" onclick="switchTab('banners')">🖼 Sự kiện</button>
         <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email SMTP</button>
       </div>
 
@@ -194,6 +212,13 @@
             </div>
             <div id="rpt-checkin-list" class="report-list"></div>
             <div id="rpt-checkin-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Chưa có check-in hôm nay</div>
+            <div id="rpt-checkin-pager" class="pager hidden">
+              <span id="rpt-ci-page-info"></span>
+              <div class="pager-btns">
+                <button class="pager-btn" id="rpt-ci-prev" onclick="ciPageChange(-1)">← Trước</button>
+                <button class="pager-btn" id="rpt-ci-next" onclick="ciPageChange(1)">Sau →</button>
+              </div>
+            </div>
           </div>
 
           <!-- Hội viên cần chăm sóc -->
@@ -202,7 +227,46 @@
             <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Liên hệ chăm sóc và gợi ý mua gói mới</div>
             <div id="rpt-low-list" class="report-list"></div>
             <div id="rpt-low-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Không có hội viên nào</div>
+            <div id="rpt-low-pager" class="pager hidden">
+              <span id="rpt-low-page-info"></span>
+              <div class="pager-btns">
+                <button class="pager-btn" id="rpt-low-prev" onclick="lowPageChange(-1)">← Trước</button>
+                <button class="pager-btn" id="rpt-low-next" onclick="lowPageChange(1)">Sau →</button>
+              </div>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- TAB: BANNERS -->
+      <div class="tab-panel" id="panel-banners">
+        <div class="table-card" style="margin-bottom:16px">
+          <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Thêm banner / sự kiện</h3>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Tải ảnh lên và gắn link (tùy chọn). Ảnh sẽ hiển thị trên trang chủ.</p>
+          <div id="banner-upload-alert" class="alert hidden"></div>
+          <div class="upload-zone" id="banner-drop" onclick="document.getElementById('banner-file').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleBannerDrop(event)">
+            <input type="file" id="banner-file" accept="image/*" onchange="previewBannerFile(this)">
+            <div id="banner-preview-wrap" style="display:none;margin-bottom:12px">
+              <img id="banner-preview-img" src="" style="max-width:200px;max-height:120px;border-radius:var(--radius);object-fit:cover">
+            </div>
+            <div id="banner-drop-text">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="1.5" style="margin:0 auto 8px;display:block"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+              <div style="font-size:13px;font-weight:500;color:var(--text2)">Kéo thả hoặc bấm để chọn ảnh</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">JPG, PNG, WEBP — tối đa 5MB</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Link khi bấm vào (tùy chọn)</label>
+            <input type="url" id="banner-link" class="form-input" placeholder="https://..." style="font-size:13px">
+          </div>
+          <button class="btn btn-primary btn-full" id="banner-upload-btn" onclick="uploadBanner()">Tải lên</button>
+        </div>
+
+        <div class="table-card" style="margin-bottom:0">
+          <h3 style="font-size:15px;font-weight:600;margin-bottom:14px">Danh sách banner <span id="banner-count" style="font-size:12px;font-weight:400;color:var(--text2)"></span></h3>
+          <div id="banner-list-loading" style="text-align:center;padding:20px;color:var(--text2);font-size:13px">Đang tải...</div>
+          <div id="banner-list"></div>
+          <div id="banner-list-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:20px">Chưa có banner nào</div>
         </div>
       </div>
 
@@ -319,6 +383,7 @@
 const API_BASE  = 'api/customers.php';
 const API_ORDERS = 'api/orders.php';
 const API_SET   = 'api/settings.php';
+const API_BANNERS = 'api/banners.php';
 let adminToken   = null;
 let allCustomers = [];
 let allOrders    = [];
@@ -326,6 +391,14 @@ let currentFilterStatus = '';
 let addTargetPhone = null, addSessions = 13, addPkg = 'pkg_10';
 let currentQROrderId = null;
 let autoRefreshTimer = null;
+
+// Report pagination
+const RPT_PER_PAGE = 10;
+let ciPage = 1, ciData = [];
+let lowPage = 1, lowData = [];
+
+// Banners
+let bannerFile = null;
 
 async function adminLogin() {
   const pw = document.getElementById('admin-pw').value;
@@ -420,6 +493,7 @@ function switchTab(name) {
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='orders') loadOrders();
   if (name==='report') loadReport();
+  if (name==='banners') loadBanners();
 }
 
 // ---- ORDERS ----
@@ -680,59 +754,184 @@ async function loadReport() {
     // Check-in hôm nay
     document.getElementById('rpt-people').textContent = json.checkin_stats.total_people;
     document.getElementById('rpt-checkins').textContent = json.checkin_stats.total_checkins;
-    const ciEl = document.getElementById('rpt-checkin-list');
-    const ciEmpty = document.getElementById('rpt-checkin-empty');
-    if (json.today_checkins && json.today_checkins.length > 0) {
-      ciEmpty.classList.add('hidden');
-      ciEl.innerHTML = json.today_checkins.map(ci => {
-        const ppl = parseInt(ci.people_count) || 1;
-        const time = new Date(ci.checked_in_at).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
-        return `<div class="report-item">
-          <div>
-            <span class="ri-name">${esc(ci.name||'—')}</span>
-            <span class="ri-phone" style="margin-left:8px">${esc(ci.phone)}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px">
-            ${ppl > 1 ? '<span style="font-size:12px;color:var(--blue)">'+ppl+' người</span>' : ''}
-            <span class="ri-sessions">${ci.sessions_before} → ${ci.sessions_after}</span>
-            <span class="ri-time">${time}</span>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      ciEl.innerHTML = ''; ciEmpty.classList.remove('hidden');
-    }
+    ciData = json.today_checkins || [];
+    ciPage = 1;
+    renderCiPage();
 
     // Hội viên cần chăm sóc
-    const lowEl = document.getElementById('rpt-low-list');
-    const lowEmpty = document.getElementById('rpt-low-empty');
     document.getElementById('rpt-low-count').textContent = '(' + (json.low_session_members?.length || 0) + ')';
-    if (json.low_session_members && json.low_session_members.length > 0) {
-      lowEmpty.classList.add('hidden');
-      lowEl.innerHTML = json.low_session_members.map(m => {
-        const s = parseInt(m.sessions);
-        const cls = s <= 2 ? 'critical' : 'low';
-        const ph = m.phone.replace(/\D/g,'');
-        const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
-        const expiry = m.expires_at ? new Date(m.expires_at).toLocaleDateString('vi-VN') : '—';
-        return `<div class="report-item">
-          <div>
-            <span class="ri-name">${esc(m.name)}</span>
-            <span class="ri-phone" style="margin-left:8px">${phFmt}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <span style="font-size:11px;color:var(--text3)">HH: ${expiry}</span>
-            <span class="ri-sessions ${cls}">${s} buổi</span>
-            <a href="tel:${ph}" class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px">📞 Gọi</a>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      lowEl.innerHTML = ''; lowEmpty.classList.remove('hidden');
-    }
+    lowData = json.low_session_members || [];
+    lowPage = 1;
+    renderLowPage();
   } catch(e) {
     loading.textContent = 'Lỗi kết nối server';
   }
+}
+
+function renderCiPage() {
+  const ciEl = document.getElementById('rpt-checkin-list');
+  const ciEmpty = document.getElementById('rpt-checkin-empty');
+  const pager = document.getElementById('rpt-checkin-pager');
+  if (!ciData.length) { ciEl.innerHTML=''; ciEmpty.classList.remove('hidden'); pager.classList.add('hidden'); return; }
+  ciEmpty.classList.add('hidden');
+  const total = ciData.length;
+  const pages = Math.ceil(total / RPT_PER_PAGE);
+  const slice = ciData.slice((ciPage-1)*RPT_PER_PAGE, ciPage*RPT_PER_PAGE);
+  ciEl.innerHTML = slice.map(ci => {
+    const ppl = parseInt(ci.people_count) || 1;
+    const time = new Date(ci.checked_in_at).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
+    return `<div class="report-item">
+      <div>
+        <span class="ri-name">${esc(ci.name||'—')}</span>
+        <span class="ri-phone" style="margin-left:8px">${esc(ci.phone)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        ${ppl > 1 ? '<span style="font-size:12px;color:var(--blue)">'+ppl+' người</span>' : ''}
+        <span class="ri-sessions">${ci.sessions_before} → ${ci.sessions_after}</span>
+        <span class="ri-time">${time}</span>
+      </div>
+    </div>`;
+  }).join('');
+  if (pages > 1) {
+    pager.classList.remove('hidden');
+    document.getElementById('rpt-ci-page-info').textContent = `Trang ${ciPage}/${pages} (${total} lượt)`;
+    document.getElementById('rpt-ci-prev').disabled = ciPage <= 1;
+    document.getElementById('rpt-ci-next').disabled = ciPage >= pages;
+  } else {
+    pager.classList.add('hidden');
+  }
+}
+function ciPageChange(d) { ciPage += d; renderCiPage(); }
+
+function renderLowPage() {
+  const lowEl = document.getElementById('rpt-low-list');
+  const lowEmpty = document.getElementById('rpt-low-empty');
+  const pager = document.getElementById('rpt-low-pager');
+  if (!lowData.length) { lowEl.innerHTML=''; lowEmpty.classList.remove('hidden'); pager.classList.add('hidden'); return; }
+  lowEmpty.classList.add('hidden');
+  const total = lowData.length;
+  const pages = Math.ceil(total / RPT_PER_PAGE);
+  const slice = lowData.slice((lowPage-1)*RPT_PER_PAGE, lowPage*RPT_PER_PAGE);
+  lowEl.innerHTML = slice.map(m => {
+    const s = parseInt(m.sessions);
+    const cls = s <= 2 ? 'critical' : 'low';
+    const ph = m.phone.replace(/\D/g,'');
+    const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+    const expiry = m.expires_at ? new Date(m.expires_at).toLocaleDateString('vi-VN') : '—';
+    return `<div class="report-item">
+      <div>
+        <span class="ri-name">${esc(m.name)}</span>
+        <span class="ri-phone" style="margin-left:8px">${phFmt}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:11px;color:var(--text3)">HH: ${expiry}</span>
+        <span class="ri-sessions ${cls}">${s} buổi</span>
+        <a href="tel:${ph}" class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px">📞 Gọi</a>
+      </div>
+    </div>`;
+  }).join('');
+  if (pages > 1) {
+    pager.classList.remove('hidden');
+    document.getElementById('rpt-low-page-info').textContent = `Trang ${lowPage}/${pages} (${total} hội viên)`;
+    document.getElementById('rpt-low-prev').disabled = lowPage <= 1;
+    document.getElementById('rpt-low-next').disabled = lowPage >= pages;
+  } else {
+    pager.classList.add('hidden');
+  }
+}
+function lowPageChange(d) { lowPage += d; renderLowPage(); }
+
+// ---- BANNERS ----
+async function loadBanners() {
+  const list = document.getElementById('banner-list');
+  const loading = document.getElementById('banner-list-loading');
+  const empty = document.getElementById('banner-list-empty');
+  loading.classList.remove('hidden'); list.innerHTML=''; empty.classList.add('hidden');
+  try {
+    const res = await fetch(`${API_BANNERS}?action=list&admin_token=${adminToken}`);
+    const json = await res.json();
+    loading.classList.add('hidden');
+    if (json.error) { list.innerHTML=`<p style="color:var(--red);font-size:13px">${esc(json.error)}</p>`; return; }
+    const banners = json.banners || [];
+    document.getElementById('banner-count').textContent = `(${banners.length})`;
+    if (!banners.length) { empty.classList.remove('hidden'); return; }
+    list.innerHTML = banners.map(b => `
+      <div class="banner-card" id="banner-${b.id}">
+        <img class="banner-thumb" src="${esc(b.image_url)}" alt="banner" onerror="this.style.background='var(--bg2)'">
+        <div class="banner-info">
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px">Ảnh #${b.id}</div>
+          <div class="banner-link">${b.link_url ? `<a href="${esc(b.link_url)}" target="_blank" style="color:var(--green)">${esc(b.link_url)}</a>` : '<span style="color:var(--text3)">Không có link</span>'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${formatDateTime(b.created_at)}</div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-sm btn-outline" style="color:var(--red);font-size:12px" onclick="deleteBanner(${b.id})">Xóa</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { loading.classList.add('hidden'); list.innerHTML='<p style="color:var(--red);font-size:13px">Lỗi kết nối</p>'; }
+}
+
+function previewBannerFile(input) {
+  bannerFile = input.files[0] || null;
+  if (!bannerFile) return;
+  const url = URL.createObjectURL(bannerFile);
+  document.getElementById('banner-preview-img').src = url;
+  document.getElementById('banner-preview-wrap').style.display='block';
+  document.getElementById('banner-drop-text').style.display='none';
+}
+
+function handleBannerDrop(e) {
+  e.preventDefault();
+  document.getElementById('banner-drop').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) {
+    bannerFile = f;
+    const url = URL.createObjectURL(f);
+    document.getElementById('banner-preview-img').src = url;
+    document.getElementById('banner-preview-wrap').style.display='block';
+    document.getElementById('banner-drop-text').style.display='none';
+  }
+}
+
+async function uploadBanner() {
+  if (!bannerFile) { showAlert('banner-upload-alert','Chưa chọn ảnh','warn'); return; }
+  if (bannerFile.size > 5*1024*1024) { showAlert('banner-upload-alert','Ảnh quá 5MB','warn'); return; }
+  const link = document.getElementById('banner-link').value.trim();
+  const btn = document.getElementById('banner-upload-btn');
+  btn.disabled=true; btn.textContent='Đang tải lên...';
+  try {
+    const fd = new FormData();
+    fd.append('image', bannerFile);
+    if (link) fd.append('link_url', link);
+    fd.append('admin_token', adminToken);
+    const res = await fetch(`${API_BANNERS}?action=create`, {method:'POST', body:fd});
+    const json = await res.json();
+    if (json.error) { showAlert('banner-upload-alert', json.error, 'error'); }
+    else {
+      showAlert('banner-upload-alert','✓ Đã tải lên thành công','success');
+      bannerFile=null;
+      document.getElementById('banner-file').value='';
+      document.getElementById('banner-preview-wrap').style.display='none';
+      document.getElementById('banner-drop-text').style.display='block';
+      document.getElementById('banner-link').value='';
+      loadBanners();
+    }
+  } catch(e) { showAlert('banner-upload-alert','Lỗi kết nối','error'); }
+  btn.disabled=false; btn.textContent='Tải lên';
+}
+
+async function deleteBanner(id) {
+  if (!confirm('Xóa banner này?')) return;
+  const card = document.getElementById('banner-'+id);
+  if (card) { card.style.opacity='.4'; card.style.pointerEvents='none'; }
+  try {
+    const res = await fetch(`${API_BANNERS}?action=delete`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id, admin_token: adminToken})
+    });
+    const json = await res.json();
+    if (json.error) { alert('Lỗi: '+json.error); if(card){card.style.opacity='1';card.style.pointerEvents='';} return; }
+    loadBanners();
+  } catch(e) { if(card){card.style.opacity='1';card.style.pointerEvents='';} }
 }
 
 function formatMoney(n) { return parseInt(n).toLocaleString('vi-VN'); }

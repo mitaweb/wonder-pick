@@ -125,3 +125,17 @@ INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
 -- Thêm cột people_count vào checkins (số người vào chơi mỗi lần check-in)
 ALTER TABLE checkins
   ADD COLUMN IF NOT EXISTS people_count INT NOT NULL DEFAULT 1;
+
+
+-- ============================================================
+-- Migration v5: Banners / Events
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS banners (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    image_path VARCHAR(255) NOT NULL,
+    link_url VARCHAR(500) DEFAULT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_sort (sort_order, created_at)
+) ENGINE=InnoDB;
