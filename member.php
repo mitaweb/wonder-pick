@@ -297,17 +297,22 @@
         </div>
       </div>
 
-      <!-- Kids counter -->
-      <div class="kids-inline">
+      <!-- Kids counter — chỉ hiện khi chọn kids hoặc addon -->
+      <div class="kids-inline" id="m-kids-row" style="display:none">
         <div class="kids-inline-left">
           <div class="title">Số trẻ em</div>
-          <div class="sub"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Mua kèm hoặc mua riêng</div>
+          <div class="sub"><?= number_format(PRICE_KIDS) ?>đ / trẻ</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
-          <div class="kids-count-num" id="kids-num">0</div>
+          <div class="kids-count-num" id="kids-num">1</div>
           <button class="counter-btn" onclick="changeKids(1)">+</button>
         </div>
+      </div>
+      <div id="m-kids-addon-row" style="display:none;margin-bottom:12px">
+        <button class="btn btn-ghost btn-full" style="font-size:13px" onclick="toggleMKidsAddon()">
+          🎠 <span id="m-kids-addon-label">+ Thêm trẻ em vào khu vui chơi</span>
+        </button>
       </div>
 
       <!-- Total + Pay button -->
@@ -611,15 +616,15 @@ async function doMemberCheckin() {
       const pplText = (json.people_count||1) > 1 ? ` (${json.people_count} người)` : '';
       showAlert('ci-alert', `✓ Check-in thành công${pplText}! Trừ ${json.sessions_before - json.sessions_after} buổi, còn ${json.sessions_after} buổi.`, 'success');
       updateSessionsDisplay(json.data, false);
-      // Reset
       ciCount = 1;
       document.getElementById('ci-count').textContent = '1';
       document.getElementById('ci-note').textContent = 'Trừ 1 lượt';
-      document.getElementById('ci-btn-text').textContent = 'Check In — trừ 1 buổi';
       // Refresh history
-      const r2 = await fetch(`${API_C}?action=get&phone=${currentCustomer.phone}`);
-      const j2 = await r2.json();
-      if (j2.checkins) renderHistory(j2.checkins);
+      try {
+        const r2 = await fetch(`${API_C}?action=get&phone=${currentCustomer.phone}`);
+        const j2 = await r2.json();
+        if (j2.checkins) renderHistory(j2.checkins);
+      } catch(_) {}
     }
   } catch(e) { showAlert('ci-alert','Lỗi kết nối server','error'); }
   const ok = parseInt(currentCustomer.sessions) >= ciCount;
@@ -628,11 +633,34 @@ async function doMemberCheckin() {
 }
 
 // ---- BUY MORE ----
+let mKidsAddonOpen = false;
+function toggleMKidsAddon() {
+  mKidsAddonOpen = !mKidsAddonOpen;
+  if (mKidsAddonOpen) {
+    if (kidsCount<1){kidsCount=1;document.getElementById('kids-num').textContent=1;}
+    document.getElementById('m-kids-row').style.display='flex';
+    document.getElementById('m-kids-addon-label').textContent='✓ Đã thêm — bấm để bỏ';
+  } else {
+    kidsCount=0; document.getElementById('kids-num').textContent=0;
+    document.getElementById('m-kids-row').style.display='none';
+    document.getElementById('m-kids-addon-label').textContent='+ Thêm trẻ em vào khu vui chơi';
+  }
+  updateBuyTotal();
+}
+
 function selectBuyPkg(el, pkg) {
   document.querySelectorAll('.mini-pkg').forEach(x=>x.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedBuyPkg = pkg;
-  if (pkg==='kids' && kidsCount===0) { kidsCount=1; document.getElementById('kids-num').textContent=1; }
+  el.classList.add('selected'); selectedBuyPkg = pkg;
+  const kidsRow = document.getElementById('m-kids-row');
+  const addonRow = document.getElementById('m-kids-addon-row');
+  if (pkg==='kids') {
+    kidsRow.style.display='flex'; addonRow.style.display='none';
+    mKidsAddonOpen=false;
+    if(kidsCount<1){kidsCount=1;document.getElementById('kids-num').textContent=1;}
+  } else {
+    addonRow.style.display='block';
+    if(!mKidsAddonOpen){kidsRow.style.display='none'; kidsCount=0; document.getElementById('kids-num').textContent=0;}
+  }
   updateBuyTotal();
 }
 

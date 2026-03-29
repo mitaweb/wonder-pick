@@ -65,18 +65,30 @@
       <div id="current-slot-info" style="font-size:13px;color:var(--text2);text-align:center;margin-top:-8px"></div>
     </div>
 
-    <div class="form-card">
+    <!-- Chưa đăng nhập -->
+    <div id="buy-login-required" class="form-card hidden" style="text-align:center;padding:32px">
+      <div style="font-size:40px;margin-bottom:12px">🔒</div>
+      <div style="font-size:17px;font-weight:600;margin-bottom:8px">Vui lòng đăng nhập</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:20px">Bạn cần đăng nhập để mua gói tập</div>
+      <a href="member.php" class="btn btn-primary btn-full" style="display:flex">Đăng nhập →</a>
+      <div style="margin-top:12px;font-size:13px;color:var(--text3)">Chưa có tài khoản? <a href="register.php" style="color:var(--green)">Đăng ký ngay</a></div>
+    </div>
+
+    <div id="buy-form-card" class="form-card hidden">
       <div class="section-title">Chọn gói tập</div>
       <div id="reg-alert" class="alert hidden"></div>
 
-      <div class="input-group">
-        <label>Số điện thoại <span class="required">*</span></label>
-        <input type="tel" id="buy-phone" class="form-input" placeholder="0901 234 567" maxlength="12" oninput="fmtPhone(this)" onblur="lookupName()">
+      <!-- Thông tin đã đăng nhập -->
+      <div id="buy-member-info" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--green-light);border-radius:var(--radius-lg);margin-bottom:16px">
+        <div style="width:38px;height:38px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:15px" id="buy-avatar">?</div>
+        <div style="flex:1">
+          <div style="font-weight:500;font-size:14px" id="buy-member-name">—</div>
+          <div style="font-size:12px;color:var(--green-dark);font-family:'DM Mono',monospace" id="buy-member-phone">—</div>
+        </div>
+        <a href="member.php" style="font-size:12px;color:var(--green)">Đổi →</a>
       </div>
-      <div class="input-group">
-        <label>Họ tên</label>
-        <input type="text" id="buy-name" class="form-input" placeholder="Tự điền hoặc đã có trong hệ thống">
-      </div>
+      <input type="hidden" id="buy-phone">
+      <input type="hidden" id="buy-name">
 
       <div class="pkg-row">
         <div class="pkg-card selected" onclick="selectPkg(this,'pkg_10')" id="opt-pkg10">
@@ -112,17 +124,23 @@
         </div>
       </div>
 
-      <!-- Trẻ em counter -->
-      <div class="kids-row">
+      <!-- Trẻ em counter — chỉ hiện khi chọn gói kids hoặc muốn thêm trẻ em -->
+      <div class="kids-row" id="kids-row" style="display:none">
         <div>
           <div style="font-weight:500;font-size:14px">Số trẻ em</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(PRICE_KIDS) ?>đ / trẻ · Mua kèm hoặc mua riêng</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(PRICE_KIDS) ?>đ / trẻ</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
-          <div class="kids-count-num" id="kids-count">0</div>
+          <div class="kids-count-num" id="kids-count">1</div>
           <button class="counter-btn" onclick="changeKids(1)">+</button>
         </div>
+      </div>
+      <!-- Nút thêm trẻ em cho gói có sẵn -->
+      <div id="kids-addon-row" style="display:none;margin-bottom:12px">
+        <button class="btn btn-ghost btn-full" style="font-size:13px;justify-content:center" onclick="toggleKidsAddon()">
+          🎠 <span id="kids-addon-label">+ Thêm trẻ em vào khu vui chơi</span>
+        </button>
       </div>
 
       <div class="total-bar">
@@ -133,7 +151,7 @@
         <div class="total-amount" id="total-display">600.000đ</div>
       </div>
       <button class="btn btn-primary btn-full" onclick="proceedToPayment()" style="font-size:16px;padding:14px">Tạo đơn & lấy QR →</button>
-    </div>
+    </div><!-- /buy-form-card -->
 
   </main>
 </div>
@@ -226,12 +244,40 @@ async function lookupName() {
   } catch(e){}
 }
 
-function changeKids(d){kidsCount=Math.max(0,kidsCount+d);document.getElementById('kids-count').textContent=kidsCount;updateTotal();}
+function changeKids(d){
+  kidsCount = Math.max(selectedPkg==='kids'?1:0, kidsCount+d);
+  document.getElementById('kids-count').textContent=kidsCount;
+  updateTotal();
+}
+
+let kidsAddonOpen = false;
+function toggleKidsAddon() {
+  kidsAddonOpen = !kidsAddonOpen;
+  if (kidsAddonOpen) {
+    if (kidsCount<1){kidsCount=1;document.getElementById('kids-count').textContent=1;}
+    document.getElementById('kids-row').style.display='flex';
+    document.getElementById('kids-addon-label').textContent='✓ Đã thêm — bấm để bỏ';
+  } else {
+    kidsCount=0; document.getElementById('kids-count').textContent=0;
+    document.getElementById('kids-row').style.display='none';
+    document.getElementById('kids-addon-label').textContent='+ Thêm trẻ em vào khu vui chơi';
+  }
+  updateTotal();
+}
 
 function selectPkg(el,type){
   document.querySelectorAll('.pkg-card').forEach(x=>x.classList.remove('selected'));
-  el.classList.add('selected');selectedPkg=type;
-  if(type==='kids' && kidsCount===0){kidsCount=1;document.getElementById('kids-count').textContent=1;}
+  el.classList.add('selected'); selectedPkg=type;
+  const kidsRow = document.getElementById('kids-row');
+  const addonRow = document.getElementById('kids-addon-row');
+  if(type==='kids'){
+    kidsRow.style.display='flex'; addonRow.style.display='none';
+    kidsAddonOpen=false;
+    if(kidsCount<1){kidsCount=1;document.getElementById('kids-count').textContent=1;}
+  } else {
+    addonRow.style.display='block';
+    if(!kidsAddonOpen){kidsRow.style.display='none'; kidsCount=0; document.getElementById('kids-count').textContent=0;}
+  }
   updateTotal();
 }
 function updateTotal(){
@@ -246,6 +292,37 @@ function updateTotal(){
   document.getElementById('total-breakdown').textContent=bd;
 }
 updateTotal();
+
+(async function initBuyPage() {
+  const saved = localStorage.getItem('wp_member');
+  if (!saved) {
+    document.getElementById('buy-login-required').classList.remove('hidden');
+    return;
+  }
+  try {
+    const {phone, password} = JSON.parse(saved);
+    const res = await fetch('api/auth.php?action=login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone, password})
+    });
+    const json = await res.json();
+    if (json.error) {
+      localStorage.removeItem('wp_member');
+      document.getElementById('buy-login-required').classList.remove('hidden');
+      return;
+    }
+    const d = json.data;
+    document.getElementById('buy-phone').value = d.phone;
+    document.getElementById('buy-name').value = d.name;
+    document.getElementById('buy-avatar').textContent = d.name.trim().split(' ').map(w=>w[0]).filter(Boolean).slice(-2).join('').toUpperCase();
+    document.getElementById('buy-member-name').textContent = d.name;
+    const ph = d.phone.replace(/\D/g,'');
+    document.getElementById('buy-member-phone').textContent = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+    document.getElementById('buy-form-card').classList.remove('hidden');
+  } catch(e) {
+    document.getElementById('buy-login-required').classList.remove('hidden');
+  }
+})();
 
 async function proceedToPayment() {
   const phone = document.getElementById('buy-phone').value.replace(/\D/g,'');
