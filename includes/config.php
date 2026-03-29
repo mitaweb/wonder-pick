@@ -110,6 +110,16 @@ function calcExpiry(string $pkg, ?string $currentExpiry = null): string {
 }
 
 
+// ---- Lấy thông tin ngân hàng (DB → fallback config) ----
+function getBankConfig(): array {
+    return [
+        'bank_id'      => getSetting('bank_id', BANK_ID),
+        'bank_account' => getSetting('bank_account', BANK_ACCOUNT),
+        'bank_owner'   => getSetting('bank_owner', BANK_OWNER),
+        'bank_name'    => getSetting('bank_name', BANK_NAME),
+    ];
+}
+
 // ---- Đọc setting từ DB (cached) ----
 function getSetting(string $key, string $default = ''): string {
     static $cache = null;

@@ -169,15 +169,15 @@
       <div style="font-size:13px;color:var(--text2);margin-bottom:14px" id="pay-pkg-label"></div>
 
       <div class="qr-img-wrap">
-        <img id="pay-qr-img" src="" alt="QR VietQR" onerror="this.style.display='none';document.getElementById('qr-fallback').style.display='block'">
-        <div id="qr-fallback" style="display:none;padding:20px;font-size:13px;color:var(--text2)">QR đang tải... Dùng thông tin thủ công bên dưới</div>
+        <img id="pay-qr-img" src="" alt="QR VietQR" style="display:none" onload="this.style.display='block';document.getElementById('qr-fallback').style.display='none'">
+        <div id="qr-fallback" style="padding:20px;font-size:13px;color:var(--text2)">QR đang tải...</div>
         <div style="font-size:11px;color:var(--text3);margin-top:6px">Mở app ngân hàng · Quét mã QR · Chuyển đúng số tiền</div>
       </div>
 
       <table class="ck-table" style="width:100%;margin-bottom:8px">
-        <tr><td>Ngân hàng</td><td><?= BANK_NAME ?></td></tr>
-        <tr><td>Số tài khoản</td><td><?= BANK_ACCOUNT ?> <button class="copy-btn" onclick="copy('<?= BANK_ACCOUNT ?>')">📋</button></td></tr>
-        <tr><td>Chủ TK</td><td><?= BANK_OWNER ?></td></tr>
+        <tr><td>Ngân hàng</td><td id="pay-bank-name"></td></tr>
+        <tr><td>Số tài khoản</td><td><span id="pay-bank-account"></span> <button class="copy-btn" onclick="copy(document.getElementById('pay-bank-account').textContent)">📋</button></td></tr>
+        <tr><td>Chủ TK</td><td id="pay-bank-owner"></td></tr>
         <tr><td>Số tiền</td><td id="pay-amount-lbl" style="color:var(--green);font-size:15px"></td></tr>
         <tr><td>Nội dung CK</td><td><strong id="pay-code" style="color:var(--green-dark)"></strong> <button class="copy-btn" onclick="copy(document.getElementById('pay-code').textContent)">📋</button></td></tr>
       </table>
@@ -343,10 +343,15 @@ async function proceedToPayment() {
 
 function showPayModal(data) {
   currentOrderCode = data.order_code;
+  document.getElementById('pay-qr-img').style.display = 'none';
+  document.getElementById('qr-fallback').style.display = 'block';
   document.getElementById('pay-qr-img').src = data.qr_url;
   document.getElementById('pay-code').textContent = data.order_code;
   document.getElementById('pay-amount-lbl').textContent = parseInt(data.amount).toLocaleString('vi-VN')+'đ';
   document.getElementById('pay-pkg-label').textContent = data.pkg_label;
+  document.getElementById('pay-bank-name').textContent = data.bank_name || '';
+  document.getElementById('pay-bank-account').textContent = data.bank_account || '';
+  document.getElementById('pay-bank-owner').textContent = data.bank_owner || '';
   document.getElementById('pay-qr-view').classList.remove('hidden');
   document.getElementById('pay-pending-view').classList.add('hidden');
   document.getElementById('pay-modal').classList.remove('hidden');

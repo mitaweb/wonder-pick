@@ -136,10 +136,11 @@
           📋 Đơn hàng
           <span class="tab-badge hidden" id="orders-badge">0</span>
         </button>
+        <button class="admin-tab" id="tab-checkin" onclick="switchTab('checkin')">✓ Check-in</button>
         <button class="admin-tab" id="tab-report" onclick="switchTab('report')">📊 Báo cáo</button>
         <button class="admin-tab" id="tab-members" onclick="switchTab('members')">👥 Thành viên</button>
         <button class="admin-tab" id="tab-banners" onclick="switchTab('banners')">🖼 Sự kiện</button>
-        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email SMTP</button>
+        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Cài đặt</button>
       </div>
 
       <!-- TAB: ORDERS -->
@@ -157,6 +158,62 @@
         </div>
         <div id="orders-list"></div>
         <div id="orders-empty" class="no-history hidden">Không có đơn hàng</div>
+      </div>
+
+      <!-- TAB: CHECK-IN -->
+      <div class="tab-panel" id="panel-checkin">
+        <div class="table-card" style="margin-bottom:16px">
+          <h3 style="font-size:16px;font-weight:500;margin-bottom:12px">Check-in khách hàng</h3>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <div style="flex:1;position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">📱</span>
+              <input type="tel" id="ci-phone-input" class="form-input" style="padding-left:38px;font-size:15px" placeholder="Nhập SĐT hoặc quét QR..." maxlength="12" onkeydown="if(event.key==='Enter')ciSearch()">
+            </div>
+            <button class="btn btn-primary" onclick="ciSearch()">Tìm</button>
+            <button class="btn btn-outline" id="ci-scan-btn" onclick="ciStartQR()">📷 QR</button>
+          </div>
+          <div id="ci-qr-wrap" style="display:none;margin-bottom:12px">
+            <div id="ci-qr-reader" style="width:100%;max-width:400px;border-radius:var(--radius-lg);overflow:hidden"></div>
+            <button class="btn btn-ghost btn-full" style="margin-top:8px;font-size:13px" onclick="ciStopQR()">✕ Đóng camera</button>
+          </div>
+          <div id="ci-search-alert" class="alert hidden"></div>
+        </div>
+
+        <div id="ci-customer-panel" class="hidden">
+          <div class="table-card" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+              <div class="customer-avatar" id="ci-avatar" style="width:52px;height:52px;font-size:18px">NA</div>
+              <div style="flex:1">
+                <div style="font-size:16px;font-weight:600" id="ci-name">—</div>
+                <div style="font-size:13px;color:var(--text2)" id="ci-phone-display">—</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:28px;font-weight:700;color:var(--green-dark)" id="ci-sessions">0</div>
+                <div style="font-size:11px;color:var(--text2)">buổi còn lại</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px;background:var(--bg2);border-radius:var(--radius-lg)">
+              <span style="font-size:14px;font-weight:500;white-space:nowrap">Số người:</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn btn-outline" style="width:36px;height:36px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="ciChangePeople(-1)">−</button>
+                <span id="ci-people-count" style="font-size:24px;font-weight:700;min-width:40px;text-align:center;color:var(--green-dark)">1</span>
+                <button class="btn btn-outline" style="width:36px;height:36px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="ciChangePeople(1)">+</button>
+              </div>
+              <span id="ci-people-note" style="font-size:12px;color:var(--text2);margin-left:auto">Trừ 1 lượt</span>
+            </div>
+
+            <div id="ci-checkin-alert" class="alert hidden"></div>
+            <button class="btn btn-primary btn-full" id="ci-checkin-btn" onclick="ciDoCheckin()" style="padding:14px;font-size:15px">
+              ✓ Check In — trừ 1 buổi
+            </button>
+          </div>
+
+          <div class="table-card">
+            <h3 style="font-size:14px;font-weight:500;margin-bottom:10px">Lịch sử check-in gần đây</h3>
+            <div id="ci-history" class="report-list"></div>
+          </div>
+        </div>
       </div>
 
       <!-- TAB: MEMBERS -->
@@ -183,23 +240,49 @@
       <div class="tab-panel" id="panel-report">
         <div id="report-loading" style="text-align:center;padding:40px;color:var(--text2)">Đang tải báo cáo...</div>
         <div id="report-content" class="hidden">
-          <!-- Doanh thu hôm nay -->
-          <div class="report-section">
-            <h3>💰 Doanh thu hôm nay</h3>
-            <div class="revenue-big" id="rpt-revenue">0đ</div>
-            <div class="revenue-sub" id="rpt-revenue-sub">0 đơn đã duyệt</div>
+
+          <!-- Date Picker -->
+          <div class="report-section" style="padding:14px 20px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:500;white-space:nowrap">📅 Khoảng ngày:</span>
+              <input type="date" id="rpt-date-from" class="form-input" style="font-size:13px;width:auto;padding:6px 10px">
+              <span style="font-size:13px;color:var(--text3)">→</span>
+              <input type="date" id="rpt-date-to" class="form-input" style="font-size:13px;width:auto;padding:6px 10px">
+              <button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="loadReport()">Xem</button>
+              <div style="display:flex;gap:4px;margin-left:auto">
+                <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="setReportDate('today')">Hôm nay</button>
+                <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="setReportDate('7d')">7 ngày</button>
+                <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="setReportDate('month')">Tháng này</button>
+              </div>
+            </div>
           </div>
 
-          <!-- Doanh thu 7 ngày -->
+          <!-- Doanh thu -->
           <div class="report-section">
-            <h3>📈 Doanh thu 7 ngày gần nhất</h3>
-            <div id="rpt-rev7" class="report-list"></div>
-            <div id="rpt-rev7-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Chưa có doanh thu</div>
+            <h3>💰 Doanh thu <span id="rpt-rev-label" style="font-size:12px;font-weight:400;color:var(--text2)"></span></h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+              <div>
+                <div class="revenue-big" id="rpt-revenue">0đ</div>
+                <div class="revenue-sub" id="rpt-revenue-sub">0 đơn đã duyệt</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:13px;color:var(--text2);margin-bottom:4px">Doanh thu tháng này</div>
+                <div style="font-size:22px;font-weight:700;color:var(--green-dark)" id="rpt-rev-month">0đ</div>
+                <div style="font-size:12px;color:var(--text3)" id="rpt-rev-month-sub"></div>
+              </div>
+            </div>
           </div>
 
-          <!-- Check-in hôm nay -->
+          <!-- Doanh thu theo ngày -->
           <div class="report-section">
-            <h3>🏃 Lượt chơi hôm nay</h3>
+            <h3>📈 Chi tiết doanh thu theo ngày</h3>
+            <div id="rpt-rev-days" class="report-list"></div>
+            <div id="rpt-rev-days-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Chưa có doanh thu</div>
+          </div>
+
+          <!-- Lượt chơi -->
+          <div class="report-section">
+            <h3>🏃 Lượt chơi <span id="rpt-ci-label" style="font-size:12px;font-weight:400;color:var(--text2)"></span></h3>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
               <div style="background:var(--green-light);border-radius:var(--radius);padding:16px;text-align:center">
                 <div style="font-size:28px;font-weight:700;color:var(--green-dark)" id="rpt-people">0</div>
@@ -272,9 +355,41 @@
 
       <!-- TAB: SMTP -->
       <div class="tab-panel" id="panel-smtp">
+        <!-- Bank Settings -->
+        <div class="table-card" style="margin-bottom:16px">
+          <div style="margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">🏦 Tài khoản ngân hàng</h3>
+            <div style="font-size:12px;color:var(--text2)">Thông tin hiển thị trên QR chuyển khoản cho khách hàng</div>
+          </div>
+          <div id="bank-alert" class="alert hidden"></div>
+          <div class="smtp-row">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Mã ngân hàng (VietQR)</label>
+              <input type="text" id="bank-id" class="form-input" style="font-size:13px" placeholder="OCB, BIDV, VCB...">
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Dùng tên viết tắt hoặc BIN. <a href="https://www.vietqr.io/danh-sach-ngan-hang" target="_blank" style="color:var(--green)">Xem danh sách →</a></div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Số tài khoản</label>
+              <input type="text" id="bank-account" class="form-input" style="font-size:13px" placeholder="0123456789">
+            </div>
+          </div>
+          <div class="smtp-row">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Chủ tài khoản</label>
+              <input type="text" id="bank-owner" class="form-input" style="font-size:13px" placeholder="NGUYEN VAN A">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Tên ngân hàng (hiển thị)</label>
+              <input type="text" id="bank-name" class="form-input" style="font-size:13px" placeholder="OCB - Ngân hàng Phương Đông">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="saveBank()">Lưu thông tin ngân hàng</button>
+        </div>
+
+        <!-- SMTP Settings -->
         <div class="table-card" style="margin-bottom:0">
           <div style="margin-bottom:16px">
-            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">Cấu hình Email SMTP</h3>
+            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">✉ Cấu hình Email SMTP</h3>
             <div style="font-size:12px;color:var(--text2)">Gửi email quên mật khẩu và thông báo cho thành viên</div>
           </div>
           <div id="smtp-alert" class="alert hidden"></div>
@@ -370,7 +485,7 @@
     <table class="ck-table" style="width:100%">
       <tr><td>Mã đơn</td><td id="oqr-code" style="font-family:'DM Mono',monospace;font-weight:500"></td></tr>
       <tr><td>Số tiền</td><td id="oqr-amount" style="color:var(--green);font-weight:600"></td></tr>
-      <tr><td>Tài khoản</td><td><?= BANK_ACCOUNT ?> (<?= BANK_NAME ?>)</td></tr>
+      <tr><td>Tài khoản</td><td id="oqr-bank-info">—</td></tr>
     </table>
     <div style="margin-top:12px">
       <button class="btn btn-primary btn-full" onclick="approveFromQR()" id="oqr-approve-btn">✓ Duyệt đơn hàng này</button>
@@ -378,6 +493,7 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
 const API_BASE  = 'api/customers.php';
@@ -461,6 +577,7 @@ async function loadDashboard() {
 
     // Load SMTP settings
     loadSmtpSettings();
+    loadBankSettings();
   } catch(e) {
     showAlert('login-alert','Lỗi kết nối server','error');
   }
@@ -521,7 +638,7 @@ function renderOrders(orders) {
     const kids = parseInt(o.kids_count||0);
 
     // VietQR link (regenerate for display)
-    const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent('<?= BANK_ID ?>')}-<?= BANK_ACCOUNT ?>-compact2.jpg?amount=${o.amount}&addInfo=${o.order_code}&accountName=${encodeURIComponent('<?= BANK_OWNER ?>')}`;
+    const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent(bankData.bank_id||'<?= BANK_ID ?>')}-${bankData.bank_account||'<?= BANK_ACCOUNT ?>'}-compact2.png?amount=${o.amount}&addInfo=${encodeURIComponent(o.order_code)}&accountName=${encodeURIComponent(bankData.bank_owner||'<?= BANK_OWNER ?>')}`;
 
     let actions = '';
     if (isPending) {
@@ -720,41 +837,113 @@ async function testSmtp() {
   btn.disabled=false;btn.textContent='Gửi test';
 }
 
+// ---- BANK SETTINGS ----
+let bankData = {};
+async function loadBankSettings() {
+  try {
+    const res = await fetch(`${API_SET}?action=get_bank&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.data) {
+      bankData = json.data;
+      document.getElementById('bank-id').value = json.data.bank_id || '';
+      document.getElementById('bank-account').value = json.data.bank_account || '';
+      document.getElementById('bank-owner').value = json.data.bank_owner || '';
+      document.getElementById('bank-name').value = json.data.bank_name || '';
+      document.getElementById('oqr-bank-info').textContent = (json.data.bank_account||'') + ' (' + (json.data.bank_name||'') + ')';
+    }
+  } catch(e) {}
+}
+
+async function saveBank() {
+  const data = {
+    bank_id: document.getElementById('bank-id').value.trim(),
+    bank_account: document.getElementById('bank-account').value.trim(),
+    bank_owner: document.getElementById('bank-owner').value.trim(),
+    bank_name: document.getElementById('bank-name').value.trim(),
+    admin_token: adminToken
+  };
+  if (!data.bank_id || !data.bank_account || !data.bank_owner) {
+    showAlert('bank-alert','Vui lòng điền đầy đủ thông tin','warn'); return;
+  }
+  try {
+    const res = await fetch(`${API_SET}?action=save_bank`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const json = await res.json();
+    if (json.error) showAlert('bank-alert', json.error, 'error');
+    else { showAlert('bank-alert','✓ Đã lưu thông tin ngân hàng','success'); loadBankSettings(); }
+  } catch(e) { showAlert('bank-alert','Lỗi kết nối','error'); }
+}
+
 // ---- REPORT ----
+let rptDateInited = false;
+
+function initReportDates() {
+  if (rptDateInited) return;
+  rptDateInited = true;
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('rpt-date-from').value = today;
+  document.getElementById('rpt-date-to').value = today;
+}
+
+function setReportDate(preset) {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0,10);
+  let from, to = fmt(today);
+  if (preset === 'today') { from = to; }
+  else if (preset === '7d') { const d = new Date(today); d.setDate(d.getDate()-6); from = fmt(d); }
+  else if (preset === 'month') { from = fmt(today).slice(0,8) + '01'; }
+  document.getElementById('rpt-date-from').value = from;
+  document.getElementById('rpt-date-to').value = to;
+  loadReport();
+}
+
 async function loadReport() {
+  initReportDates();
   const loading = document.getElementById('report-loading');
   const content = document.getElementById('report-content');
   loading.classList.remove('hidden'); content.classList.add('hidden');
 
+  const dateFrom = document.getElementById('rpt-date-from').value;
+  const dateTo = document.getElementById('rpt-date-to').value;
+  const isToday = dateFrom === dateTo && dateFrom === new Date().toISOString().slice(0,10);
+  const dateLabel = isToday ? 'hôm nay' : (dateFrom === dateTo ? formatDateShort(dateFrom) : formatDateShort(dateFrom) + ' → ' + formatDateShort(dateTo));
+
   try {
-    const res = await fetch(`${API_BASE}?action=report&admin_token=${adminToken}`);
+    const res = await fetch(`${API_BASE}?action=report&admin_token=${adminToken}&date_from=${dateFrom}&date_to=${dateTo}`);
     const json = await res.json();
     if (json.error) { loading.textContent = 'Lỗi: ' + json.error; return; }
 
     loading.classList.add('hidden'); content.classList.remove('hidden');
 
-    // Doanh thu hôm nay
-    document.getElementById('rpt-revenue').textContent = formatMoney(json.revenue.today) + 'đ';
-    document.getElementById('rpt-revenue-sub').textContent = json.revenue.paid_count + ' đơn đã duyệt hôm nay';
+    // Doanh thu
+    document.getElementById('rpt-rev-label').textContent = dateLabel;
+    document.getElementById('rpt-revenue').textContent = formatMoney(json.revenue.total) + 'đ';
+    document.getElementById('rpt-revenue-sub').textContent = json.revenue.paid_count + ' đơn đã duyệt';
 
-    // Doanh thu 7 ngày
-    const rev7El = document.getElementById('rpt-rev7');
-    const rev7Empty = document.getElementById('rpt-rev7-empty');
-    if (json.revenue_7days && json.revenue_7days.length > 0) {
-      rev7Empty.classList.add('hidden');
-      rev7El.innerHTML = json.revenue_7days.map(d => `
+    // Doanh thu tháng
+    if (json.revenue_month) {
+      document.getElementById('rpt-rev-month').textContent = formatMoney(json.revenue_month.total) + 'đ';
+      document.getElementById('rpt-rev-month-sub').textContent = json.revenue_month.paid_count + ' đơn — T' + json.revenue_month.month_label;
+    }
+
+    // Doanh thu theo ngày
+    const revDaysEl = document.getElementById('rpt-rev-days');
+    const revDaysEmpty = document.getElementById('rpt-rev-days-empty');
+    if (json.revenue_days && json.revenue_days.length > 0) {
+      revDaysEmpty.classList.add('hidden');
+      revDaysEl.innerHTML = json.revenue_days.map(d => `
         <div class="rev-day">
           <span class="rd-date">${formatDateShort(d.day)}</span>
           <span class="rd-amount">${formatMoney(d.revenue)}đ (${d.orders} đơn)</span>
         </div>`).join('');
     } else {
-      rev7El.innerHTML = ''; rev7Empty.classList.remove('hidden');
+      revDaysEl.innerHTML = ''; revDaysEmpty.classList.remove('hidden');
     }
 
-    // Check-in hôm nay
+    // Lượt chơi
+    document.getElementById('rpt-ci-label').textContent = dateLabel;
     document.getElementById('rpt-people').textContent = json.checkin_stats.total_people;
     document.getElementById('rpt-checkins').textContent = json.checkin_stats.total_checkins;
-    ciData = json.today_checkins || [];
+    ciData = json.date_checkins || [];
     ciPage = 1;
     renderCiPage();
 
@@ -779,7 +968,8 @@ function renderCiPage() {
   const slice = ciData.slice((ciPage-1)*RPT_PER_PAGE, ciPage*RPT_PER_PAGE);
   ciEl.innerHTML = slice.map(ci => {
     const ppl = parseInt(ci.people_count) || 1;
-    const time = new Date(ci.checked_in_at).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
+    const dt = new Date(ci.checked_in_at);
+    const time = dt.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
     return `<div class="report-item">
       <div>
         <span class="ri-name">${esc(ci.name||'—')}</span>
@@ -840,6 +1030,114 @@ function renderLowPage() {
   }
 }
 function lowPageChange(d) { lowPage += d; renderLowPage(); }
+
+// ---- CHECK-IN ----
+let ciCustomer = null, ciPeople = 1, ciQrScanner = null;
+
+function ciSearch() {
+  const raw = document.getElementById('ci-phone-input').value.replace(/\D/g,'');
+  if (raw.length < 9) { showAlert('ci-search-alert','Nhập đủ SĐT','warn'); return; }
+  hideAlert('ci-search-alert');
+  fetch(`${API_BASE}?action=get&phone=${raw}`)
+    .then(r=>r.json()).then(json => {
+      if (!json.data) { showAlert('ci-search-alert','Không tìm thấy khách hàng','error'); document.getElementById('ci-customer-panel').classList.add('hidden'); return; }
+      ciCustomer = json.data; ciPeople = 1;
+      ciRender(json.data, json.checkins||[]);
+    }).catch(()=>showAlert('ci-search-alert','Lỗi kết nối','error'));
+}
+
+function ciRender(c, checkins) {
+  document.getElementById('ci-customer-panel').classList.remove('hidden');
+  document.getElementById('ci-avatar').textContent = c.name.trim().split(' ').map(w=>w[0]).filter(Boolean).slice(-2).join('').toUpperCase();
+  document.getElementById('ci-name').textContent = c.name;
+  const ph = c.phone.replace(/\D/g,'');
+  document.getElementById('ci-phone-display').textContent = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+  document.getElementById('ci-sessions').textContent = c.sessions;
+  ciPeople = 1;
+  document.getElementById('ci-people-count').textContent = '1';
+  document.getElementById('ci-people-note').textContent = 'Trừ 1 lượt';
+  ciUpdateBtn();
+  hideAlert('ci-checkin-alert');
+  // History
+  const el = document.getElementById('ci-history');
+  if (!checkins.length) { el.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px">Chưa có lịch sử</div>'; return; }
+  el.innerHTML = checkins.slice(0,8).map(ci => {
+    const ppl = parseInt(ci.people_count)||1;
+    const time = new Date(ci.checked_in_at).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+    const date = new Date(ci.checked_in_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'});
+    return `<div class="report-item">
+      <div><span class="ri-name">${date} ${time}</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${ppl>1?'<span style="font-size:11px;color:var(--blue)">'+ppl+' người</span>':''}
+        <span class="ri-sessions">${ci.sessions_before} → ${ci.sessions_after}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ciChangePeople(d) {
+  const max = ciCustomer ? parseInt(ciCustomer.sessions) : 20;
+  ciPeople = Math.max(1, Math.min(max, ciPeople+d));
+  document.getElementById('ci-people-count').textContent = ciPeople;
+  document.getElementById('ci-people-note').textContent = `Trừ ${ciPeople} lượt`;
+  ciUpdateBtn();
+}
+
+function ciUpdateBtn() {
+  const btn = document.getElementById('ci-checkin-btn');
+  const s = ciCustomer ? parseInt(ciCustomer.sessions) : 0;
+  const ok = s >= ciPeople;
+  btn.disabled = !ok; btn.style.opacity = ok?'1':'.45';
+  btn.textContent = `✓ Check In — trừ ${ciPeople} buổi`;
+}
+
+async function ciDoCheckin() {
+  if (!ciCustomer || parseInt(ciCustomer.sessions) < ciPeople) return;
+  const btn = document.getElementById('ci-checkin-btn');
+  btn.disabled = true; btn.textContent = 'Đang xử lý...';
+  try {
+    const res = await fetch(`${API_BASE}?action=checkin`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone: ciCustomer.phone, count: ciPeople})
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('ci-checkin-alert', json.error, 'error'); }
+    else {
+      ciCustomer = json.data;
+      document.getElementById('ci-sessions').textContent = json.data.sessions;
+      const pplText = (json.people_count||1)>1 ? ` (${json.people_count} người)` : '';
+      showAlert('ci-checkin-alert', `✓ Check-in thành công${pplText}! Trừ ${json.sessions_before-json.sessions_after} buổi, còn ${json.sessions_after} buổi.`, 'success');
+      ciPeople = 1;
+      document.getElementById('ci-people-count').textContent = '1';
+      document.getElementById('ci-people-note').textContent = 'Trừ 1 lượt';
+      // Refresh history
+      try { const r2 = await fetch(`${API_BASE}?action=get&phone=${ciCustomer.phone}`); const j2 = await r2.json(); if(j2.checkins) ciRender(j2.data, j2.checkins); } catch(_){}
+    }
+  } catch(e) { showAlert('ci-checkin-alert','Lỗi kết nối','error'); }
+  ciUpdateBtn();
+}
+
+function ciStartQR() {
+  document.getElementById('ci-qr-wrap').style.display = 'block';
+  document.getElementById('ci-scan-btn').disabled = true;
+  ciQrScanner = new Html5Qrcode('ci-qr-reader');
+  Html5Qrcode.getCameras().then(cameras => {
+    if (!cameras.length) { showAlert('ci-search-alert','Không tìm thấy camera','error'); ciStopQR(); return; }
+    const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length-1];
+    ciQrScanner.start(cam.id, {fps:10, qrbox:{width:250,height:250}}, text => {
+      ciStopQR();
+      let phone = text.startsWith('WP-') ? text.replace('WP-','') : text.replace(/\D/g,'');
+      if (phone.length >= 9) { document.getElementById('ci-phone-input').value = phone; ciSearch(); }
+      else showAlert('ci-search-alert','Mã QR không hợp lệ','error');
+    }, ()=>{}).catch(err => { showAlert('ci-search-alert','Không thể mở camera: '+err,'error'); ciStopQR(); });
+  }).catch(()=>{ showAlert('ci-search-alert','Trình duyệt không hỗ trợ camera','error'); ciStopQR(); });
+}
+
+function ciStopQR() {
+  if (ciQrScanner) { ciQrScanner.stop().catch(()=>{}); ciQrScanner=null; }
+  document.getElementById('ci-qr-wrap').style.display = 'none';
+  document.getElementById('ci-scan-btn').disabled = false;
+}
 
 // ---- BANNERS ----
 async function loadBanners() {

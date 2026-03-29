@@ -80,6 +80,32 @@ switch ($action) {
         }
         break;
 
+    // GET: Lấy cấu hình ngân hàng
+    case 'get_bank':
+        requireAdmin();
+        jsonResponse(['success' => true, 'data' => [
+            'bank_id'      => getSetting('bank_id', BANK_ID),
+            'bank_account' => getSetting('bank_account', BANK_ACCOUNT),
+            'bank_owner'   => getSetting('bank_owner', BANK_OWNER),
+            'bank_name'    => getSetting('bank_name', BANK_NAME),
+        ]]);
+        break;
+
+    // POST: Lưu cấu hình ngân hàng
+    case 'save_bank':
+        requireAdmin();
+        $input = getJsonInput();
+        $db = getDB();
+        $keys = ['bank_id', 'bank_account', 'bank_owner', 'bank_name'];
+        $stmt = $db->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        foreach ($keys as $k) {
+            if (isset($input[$k]) && trim($input[$k]) !== '') {
+                $stmt->execute([$k, trim($input[$k])]);
+            }
+        }
+        jsonResponse(['success' => true, 'message' => 'Đã lưu thông tin ngân hàng']);
+        break;
+
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);
 }
