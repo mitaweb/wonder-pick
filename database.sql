@@ -117,3 +117,16 @@ INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
   ('smtp_pass',     ''),
   ('smtp_from_name','Wonder Pickleball'),
   ('smtp_enabled',  '0');
+
+-- ============================================================
+-- Migration v4: Check-in nhiều người & Zalo OA notification
+-- ============================================================
+
+-- Thêm cột people_count vào checkins (số người vào chơi mỗi lần check-in)
+ALTER TABLE checkins
+  ADD COLUMN IF NOT EXISTS people_count INT NOT NULL DEFAULT 1;
+
+-- Cấu hình Zalo OA Bot
+INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
+  ('zalo_oa_token', ''),
+  ('zalo_enabled',  '0');

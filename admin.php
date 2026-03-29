@@ -49,6 +49,24 @@
 .refresh-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);margin-bottom:12px}
 .refresh-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Report */
+.report-section{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.report-section h3{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.report-list{display:flex;flex-direction:column;gap:8px}
+.report-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-radius:var(--radius);font-size:13px}
+.report-item .ri-name{font-weight:500}
+.report-item .ri-phone{font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)}
+.report-item .ri-sessions{font-weight:600}
+.report-item .ri-sessions.low{color:var(--amber)}
+.report-item .ri-sessions.critical{color:var(--red)}
+.report-item .ri-time{font-size:12px;color:var(--text3)}
+.revenue-big{font-size:36px;font-weight:700;color:var(--green-dark);margin-bottom:4px}
+.revenue-sub{font-size:13px;color:var(--text2)}
+.rev-day{display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.rev-day:last-child{border-bottom:none}
+.rev-day .rd-date{color:var(--text2)}
+.rev-day .rd-amount{font-weight:600;color:var(--green-dark)}
 </style>
 </head>
 <body>
@@ -101,8 +119,10 @@
           📋 Đơn hàng
           <span class="tab-badge hidden" id="orders-badge">0</span>
         </button>
+        <button class="admin-tab" id="tab-report" onclick="switchTab('report')">📊 Báo cáo</button>
         <button class="admin-tab" id="tab-members" onclick="switchTab('members')">👥 Thành viên</button>
-        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email SMTP</button>
+        <button class="admin-tab" id="tab-zalo" onclick="switchTab('zalo')">💬 Zalo Bot</button>
+        <button class="admin-tab" id="tab-smtp" onclick="switchTab('smtp')">⚙ Email</button>
       </div>
 
       <!-- TAB: ORDERS -->
@@ -139,6 +159,93 @@
             </table>
           </div>
           <div id="no-data" class="no-history hidden">Không có dữ liệu</div>
+        </div>
+      </div>
+
+      <!-- TAB: REPORT -->
+      <div class="tab-panel" id="panel-report">
+        <div id="report-loading" style="text-align:center;padding:40px;color:var(--text2)">Đang tải báo cáo...</div>
+        <div id="report-content" class="hidden">
+          <!-- Doanh thu hôm nay -->
+          <div class="report-section">
+            <h3>💰 Doanh thu hôm nay</h3>
+            <div class="revenue-big" id="rpt-revenue">0đ</div>
+            <div class="revenue-sub" id="rpt-revenue-sub">0 đơn đã duyệt</div>
+          </div>
+
+          <!-- Doanh thu 7 ngày -->
+          <div class="report-section">
+            <h3>📈 Doanh thu 7 ngày gần nhất</h3>
+            <div id="rpt-rev7" class="report-list"></div>
+            <div id="rpt-rev7-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Chưa có doanh thu</div>
+          </div>
+
+          <!-- Check-in hôm nay -->
+          <div class="report-section">
+            <h3>🏃 Lượt chơi hôm nay</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+              <div style="background:var(--green-light);border-radius:var(--radius);padding:16px;text-align:center">
+                <div style="font-size:28px;font-weight:700;color:var(--green-dark)" id="rpt-people">0</div>
+                <div style="font-size:12px;color:var(--green-dark)">Người vào chơi</div>
+              </div>
+              <div style="background:var(--bg2);border-radius:var(--radius);padding:16px;text-align:center">
+                <div style="font-size:28px;font-weight:700;color:var(--text)" id="rpt-checkins">0</div>
+                <div style="font-size:12px;color:var(--text2)">Lượt check-in</div>
+              </div>
+            </div>
+            <div id="rpt-checkin-list" class="report-list"></div>
+            <div id="rpt-checkin-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Chưa có check-in hôm nay</div>
+          </div>
+
+          <!-- Hội viên cần chăm sóc -->
+          <div class="report-section">
+            <h3>⚠ Hội viên còn dưới 5 buổi <span style="font-size:12px;font-weight:400;color:var(--text3)" id="rpt-low-count">(0)</span></h3>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Liên hệ chăm sóc và gợi ý mua gói mới</div>
+            <div id="rpt-low-list" class="report-list"></div>
+            <div id="rpt-low-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Không có hội viên nào</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: ZALO -->
+      <div class="tab-panel" id="panel-zalo">
+        <div class="table-card" style="margin-bottom:0">
+          <div style="margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">Cấu hình Zalo OA Bot</h3>
+            <div style="font-size:12px;color:var(--text2)">Gửi thông báo check-in và lượt chơi còn lại cho hội viên qua Zalo</div>
+          </div>
+          <div id="zalo-alert" class="alert hidden"></div>
+          <div class="form-group">
+            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Trạng thái</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="zalo-enabled" style="width:18px;height:18px;accent-color:var(--green)">
+              <span style="font-size:14px">Bật thông báo Zalo</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">
+              Access Token (Zalo OA)
+              <a href="https://developers.zalo.me/docs/official-account" target="_blank" style="color:var(--green);font-weight:400;margin-left:6px;font-size:11px">Hướng dẫn →</a>
+            </label>
+            <div class="pw-wrap">
+              <input type="password" id="zalo-token" class="form-input" placeholder="Dán Access Token từ Zalo Developers...">
+              <button class="pw-toggle" onclick="togglePw('zalo-token',this)">👁</button>
+            </div>
+            <div id="zalo-token-hint" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+          </div>
+          <div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:var(--radius);padding:12px;font-size:12px;color:#185FA5;margin-bottom:14px;line-height:1.8">
+            <strong>Hướng dẫn cấu hình Zalo OA:</strong><br>
+            1. Tạo Zalo Official Account tại <a href="https://oa.zalo.me" target="_blank" style="color:#185FA5">oa.zalo.me</a><br>
+            2. Đăng ký app tại <a href="https://developers.zalo.me" target="_blank" style="color:#185FA5">developers.zalo.me</a> → liên kết OA<br>
+            3. Lấy Access Token (OA) → dán vào ô trên<br>
+            4. Người dùng cần <strong>follow OA</strong> để nhận được tin nhắn<br>
+            <br>
+            <strong>Lưu ý:</strong> Khi hội viên check-in, hệ thống sẽ tự động gửi thông báo gồm:<br>
+            • Số người vào chơi<br>
+            • Số lượt đã trừ<br>
+            • Số lượt còn lại trên thẻ
+          </div>
+          <button class="btn btn-primary btn-full" onclick="saveZalo()">Lưu cấu hình Zalo</button>
         </div>
       </div>
 
@@ -345,6 +452,8 @@ function switchTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
   if (name==='orders') loadOrders();
+  if (name==='report') loadReport();
+  if (name==='zalo') loadZaloSettings();
 }
 
 // ---- ORDERS ----
@@ -569,6 +678,133 @@ async function testSmtp() {
     else showAlert('smtp-alert','✓ '+json.message,'success');
   }catch(e){showAlert('smtp-alert','Lỗi kết nối','error');}
   btn.disabled=false;btn.textContent='Gửi test';
+}
+
+// ---- REPORT ----
+async function loadReport() {
+  const loading = document.getElementById('report-loading');
+  const content = document.getElementById('report-content');
+  loading.classList.remove('hidden'); content.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API_BASE}?action=report&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.error) { loading.textContent = 'Lỗi: ' + json.error; return; }
+
+    loading.classList.add('hidden'); content.classList.remove('hidden');
+
+    // Doanh thu hôm nay
+    document.getElementById('rpt-revenue').textContent = formatMoney(json.revenue.today) + 'đ';
+    document.getElementById('rpt-revenue-sub').textContent = json.revenue.paid_count + ' đơn đã duyệt hôm nay';
+
+    // Doanh thu 7 ngày
+    const rev7El = document.getElementById('rpt-rev7');
+    const rev7Empty = document.getElementById('rpt-rev7-empty');
+    if (json.revenue_7days && json.revenue_7days.length > 0) {
+      rev7Empty.classList.add('hidden');
+      rev7El.innerHTML = json.revenue_7days.map(d => `
+        <div class="rev-day">
+          <span class="rd-date">${formatDateShort(d.day)}</span>
+          <span class="rd-amount">${formatMoney(d.revenue)}đ (${d.orders} đơn)</span>
+        </div>`).join('');
+    } else {
+      rev7El.innerHTML = ''; rev7Empty.classList.remove('hidden');
+    }
+
+    // Check-in hôm nay
+    document.getElementById('rpt-people').textContent = json.checkin_stats.total_people;
+    document.getElementById('rpt-checkins').textContent = json.checkin_stats.total_checkins;
+    const ciEl = document.getElementById('rpt-checkin-list');
+    const ciEmpty = document.getElementById('rpt-checkin-empty');
+    if (json.today_checkins && json.today_checkins.length > 0) {
+      ciEmpty.classList.add('hidden');
+      ciEl.innerHTML = json.today_checkins.map(ci => {
+        const ppl = parseInt(ci.people_count) || 1;
+        const time = new Date(ci.checked_in_at).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
+        return `<div class="report-item">
+          <div>
+            <span class="ri-name">${esc(ci.name||'—')}</span>
+            <span class="ri-phone" style="margin-left:8px">${esc(ci.phone)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            ${ppl > 1 ? '<span style="font-size:12px;color:var(--blue)">'+ppl+' người</span>' : ''}
+            <span class="ri-sessions">${ci.sessions_before} → ${ci.sessions_after}</span>
+            <span class="ri-time">${time}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      ciEl.innerHTML = ''; ciEmpty.classList.remove('hidden');
+    }
+
+    // Hội viên cần chăm sóc
+    const lowEl = document.getElementById('rpt-low-list');
+    const lowEmpty = document.getElementById('rpt-low-empty');
+    document.getElementById('rpt-low-count').textContent = '(' + (json.low_session_members?.length || 0) + ')';
+    if (json.low_session_members && json.low_session_members.length > 0) {
+      lowEmpty.classList.add('hidden');
+      lowEl.innerHTML = json.low_session_members.map(m => {
+        const s = parseInt(m.sessions);
+        const cls = s <= 2 ? 'critical' : 'low';
+        const ph = m.phone.replace(/\D/g,'');
+        const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+        const expiry = m.expires_at ? new Date(m.expires_at).toLocaleDateString('vi-VN') : '—';
+        return `<div class="report-item">
+          <div>
+            <span class="ri-name">${esc(m.name)}</span>
+            <span class="ri-phone" style="margin-left:8px">${phFmt}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:11px;color:var(--text3)">HH: ${expiry}</span>
+            <span class="ri-sessions ${cls}">${s} buổi</span>
+            <a href="tel:${ph}" class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px">📞 Gọi</a>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      lowEl.innerHTML = ''; lowEmpty.classList.remove('hidden');
+    }
+  } catch(e) {
+    loading.textContent = 'Lỗi kết nối server';
+  }
+}
+
+function formatMoney(n) { return parseInt(n).toLocaleString('vi-VN'); }
+function formatDateShort(d) { const dt = new Date(d); return dt.toLocaleDateString('vi-VN', {weekday:'short', day:'2-digit', month:'2-digit'}); }
+
+// ---- ZALO ----
+async function loadZaloSettings() {
+  try {
+    const res = await fetch(`${API_SET}?action=get_zalo&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.data) {
+      document.getElementById('zalo-enabled').checked = json.data.zalo_enabled === '1';
+      if (json.data.zalo_token_set) {
+        document.getElementById('zalo-token-hint').textContent = '✓ Access Token đã được lưu. Điền lại nếu muốn thay đổi.';
+      }
+    }
+  } catch(e) {}
+}
+
+async function saveZalo() {
+  const data = {
+    zalo_enabled: document.getElementById('zalo-enabled').checked ? '1' : '0',
+    zalo_oa_token: document.getElementById('zalo-token').value,
+    admin_token: adminToken
+  };
+  try {
+    const res = await fetch(`${API_SET}?action=save_zalo`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (json.error) showAlert('zalo-alert', json.error, 'error');
+    else {
+      showAlert('zalo-alert', '✓ Đã lưu cấu hình Zalo OA', 'success');
+      document.getElementById('zalo-token').value = '';
+      loadZaloSettings();
+    }
+  } catch(e) { showAlert('zalo-alert', 'Lỗi kết nối', 'error'); }
 }
 
 // ---- UTILS ----
