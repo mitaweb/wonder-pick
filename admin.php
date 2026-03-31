@@ -219,9 +219,12 @@
       <!-- TAB: MEMBERS -->
       <div class="tab-panel" id="panel-members">
         <div class="table-card" style="margin-bottom:0">
-          <div class="table-header">
+          <div class="table-header" style="flex-wrap:wrap;gap:8px">
             <h3>Danh sách thành viên</h3>
-            <input type="text" class="form-input" style="width:210px;font-size:13px" placeholder="Tìm tên hoặc SĐT..." oninput="filterList(this.value)">
+            <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+              <input type="text" class="form-input" style="width:180px;font-size:13px" placeholder="Tìm tên hoặc SĐT..." oninput="filterList(this.value)">
+              <button class="btn btn-outline" style="font-size:12px;white-space:nowrap;padding:7px 12px" onclick="exportMembers()">📥 Xuất Excel</button>
+            </div>
           </div>
           <div style="overflow-x:auto">
             <table class="data-table" id="customer-table">
@@ -386,6 +389,48 @@
           <button class="btn btn-primary btn-full" onclick="saveBank()">Lưu thông tin ngân hàng</button>
         </div>
 
+        <!-- Pricing Settings -->
+        <div class="table-card" style="margin-bottom:16px">
+          <div style="margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:500;margin-bottom:2px">💰 Bảng giá & Gói tập</h3>
+            <div style="font-size:12px;color:var(--text2)">Thay đổi giá sẽ áp dụng cho đơn hàng mới</div>
+          </div>
+          <div id="pricing-alert" class="alert hidden"></div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--green-dark)">Gói thẻ</div>
+          <div class="smtp-row">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gói 10 tặng 3 (13 buổi, 1 tháng)</label>
+              <input type="number" id="price-pkg10" class="form-input" style="font-size:13px" min="0" step="10000">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gói 30 tặng 10 (40 buổi, 3 tháng)</label>
+              <input type="number" id="price-pkg30" class="form-input" style="font-size:13px" min="0" step="10000">
+            </div>
+          </div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px;margin-top:12px;color:var(--green-dark)">Giá lẻ theo khung giờ</div>
+          <div class="smtp-row">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Sáng (8h - 11h)</label>
+              <input type="number" id="price-morning" class="form-input" style="font-size:13px" min="0" step="5000">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Trưa (11h - 16h)</label>
+              <input type="number" id="price-noon" class="form-input" style="font-size:13px" min="0" step="5000">
+            </div>
+          </div>
+          <div class="smtp-row">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Chiều/Tối (16h - 22h)</label>
+              <input type="number" id="price-evening" class="form-input" style="font-size:13px" min="0" step="5000">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Khu vui chơi trẻ em (/trẻ)</label>
+              <input type="number" id="price-kids" class="form-input" style="font-size:13px" min="0" step="5000">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="savePricing()" style="margin-top:4px">Lưu bảng giá</button>
+        </div>
+
         <!-- SMTP Settings -->
         <div class="table-card" style="margin-bottom:0">
           <div style="margin-bottom:16px">
@@ -470,6 +515,42 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAddModal()">Hủy</button>
       <button class="btn btn-primary" onclick="confirmAdd()">Xác nhận cộng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Member Modal -->
+<div id="edit-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal" style="max-width:440px">
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <div class="modal-title">Chỉnh sửa thành viên</div>
+    <input type="hidden" id="edit-phone-key">
+    <div id="edit-modal-alert" class="alert hidden"></div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Họ tên</label>
+      <input type="text" id="edit-name" class="form-input">
+    </div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Email</label>
+      <input type="email" id="edit-email" class="form-input" placeholder="example@gmail.com">
+    </div>
+    <div class="smtp-row">
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">Buổi còn lại</label>
+        <input type="number" id="edit-sessions" class="form-input" min="0">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">Tổng buổi (max)</label>
+        <input type="number" id="edit-max-sessions" class="form-input" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Ngày hết hạn</label>
+      <input type="date" id="edit-expiry" class="form-input">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEditModal()">Hủy</button>
+      <button class="btn btn-primary" onclick="saveEditMember()">Lưu thay đổi</button>
     </div>
   </div>
 </div>
@@ -578,6 +659,7 @@ async function loadDashboard() {
     // Load SMTP settings
     loadSmtpSettings();
     loadBankSettings();
+    loadPricing();
   } catch(e) {
     showAlert('login-alert','Lỗi kết nối server','error');
   }
@@ -743,7 +825,10 @@ function renderTable(customers) {
       <td style="font-size:12px;color:var(--text2)">${esc(c.email||'—')}</td>
       <td><span class="sess-badge ${badge}">${s}</span></td>
       <td>${expiry}</td>
-      <td><button class="btn btn-sm btn-primary" onclick="openAddModal('${esc(c.phone)}','${esc(c.name)}',${s})">+ Cộng</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;margin-right:4px" onclick="openEditModal('${esc(c.phone)}')">✏ Sửa</button>
+        <button class="btn btn-sm btn-primary" onclick="openAddModal('${esc(c.phone)}','${esc(c.name)}',${s})">+ Cộng</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -789,6 +874,51 @@ async function confirmAdd() {
 }
 
 function closeAddModal(){document.getElementById('add-modal').classList.add('hidden');}
+
+// ---- EDIT MEMBER ----
+function openEditModal(phone) {
+  const c = allCustomers.find(x => x.phone === phone);
+  if (!c) return;
+  document.getElementById('edit-phone-key').value = c.phone;
+  document.getElementById('edit-name').value = c.name;
+  document.getElementById('edit-email').value = c.email || '';
+  document.getElementById('edit-sessions').value = c.sessions;
+  document.getElementById('edit-max-sessions').value = c.max_sessions;
+  document.getElementById('edit-expiry').value = c.expires_at || '';
+  hideAlert('edit-modal-alert');
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal(){document.getElementById('edit-modal').classList.add('hidden');}
+
+async function saveEditMember() {
+  const phone = document.getElementById('edit-phone-key').value;
+  const data = {
+    phone,
+    name: document.getElementById('edit-name').value.trim(),
+    email: document.getElementById('edit-email').value.trim(),
+    sessions: parseInt(document.getElementById('edit-sessions').value) || 0,
+    max_sessions: parseInt(document.getElementById('edit-max-sessions').value) || 0,
+    expires_at: document.getElementById('edit-expiry').value || null,
+    admin_token: adminToken
+  };
+  if (!data.name) { showAlert('edit-modal-alert','Tên không được để trống','warn'); return; }
+  try {
+    const res = await fetch(`${API_BASE}?action=update_customer`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('edit-modal-alert', json.error, 'error'); return; }
+    closeEditModal();
+    loadDashboard();
+  } catch(e) { showAlert('edit-modal-alert','Lỗi kết nối','error'); }
+}
+
+// ---- EXPORT ----
+function exportMembers() {
+  window.open(`${API_BASE}?action=export_csv&admin_token=${adminToken}`, '_blank');
+}
 
 // ---- SMTP ----
 async function loadSmtpSettings() {
@@ -871,6 +1001,40 @@ async function saveBank() {
     if (json.error) showAlert('bank-alert', json.error, 'error');
     else { showAlert('bank-alert','✓ Đã lưu thông tin ngân hàng','success'); loadBankSettings(); }
   } catch(e) { showAlert('bank-alert','Lỗi kết nối','error'); }
+}
+
+// ---- PRICING ----
+async function loadPricing() {
+  try {
+    const res = await fetch(`${API_SET}?action=get_pricing&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.data) {
+      document.getElementById('price-pkg10').value = json.data.price_pkg_10 || 0;
+      document.getElementById('price-pkg30').value = json.data.price_pkg_30 || 0;
+      document.getElementById('price-morning').value = json.data.price_social_morning || 0;
+      document.getElementById('price-noon').value = json.data.price_social_noon || 0;
+      document.getElementById('price-evening').value = json.data.price_social_evening || 0;
+      document.getElementById('price-kids').value = json.data.price_kids || 0;
+    }
+  } catch(e) {}
+}
+
+async function savePricing() {
+  const data = {
+    price_pkg_10: parseInt(document.getElementById('price-pkg10').value) || 0,
+    price_pkg_30: parseInt(document.getElementById('price-pkg30').value) || 0,
+    price_social_morning: parseInt(document.getElementById('price-morning').value) || 0,
+    price_social_noon: parseInt(document.getElementById('price-noon').value) || 0,
+    price_social_evening: parseInt(document.getElementById('price-evening').value) || 0,
+    price_kids: parseInt(document.getElementById('price-kids').value) || 0,
+    admin_token: adminToken
+  };
+  try {
+    const res = await fetch(`${API_SET}?action=save_pricing`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const json = await res.json();
+    if (json.error) showAlert('pricing-alert', json.error, 'error');
+    else showAlert('pricing-alert', '✓ Đã lưu bảng giá', 'success');
+  } catch(e) { showAlert('pricing-alert','Lỗi kết nối','error'); }
 }
 
 // ---- REPORT ----

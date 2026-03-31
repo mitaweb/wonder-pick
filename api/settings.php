@@ -80,6 +80,34 @@ switch ($action) {
         }
         break;
 
+    // GET: Lấy bảng giá
+    case 'get_pricing':
+        requireAdmin();
+        jsonResponse(['success' => true, 'data' => [
+            'price_pkg_10'        => (int)getSetting('price_pkg_10', (string)PRICE_PKG_10),
+            'price_pkg_30'        => (int)getSetting('price_pkg_30', (string)PRICE_PKG_30),
+            'price_social_morning'=> (int)getSetting('price_social_morning', (string)PRICE_SOCIAL_MORNING),
+            'price_social_noon'   => (int)getSetting('price_social_noon', (string)PRICE_SOCIAL_NOON),
+            'price_social_evening'=> (int)getSetting('price_social_evening', (string)PRICE_SOCIAL_EVENING),
+            'price_kids'          => (int)getSetting('price_kids', (string)PRICE_KIDS),
+        ]]);
+        break;
+
+    // POST: Lưu bảng giá
+    case 'save_pricing':
+        requireAdmin();
+        $input = getJsonInput();
+        $db = getDB();
+        $keys = ['price_pkg_10','price_pkg_30','price_social_morning','price_social_noon','price_social_evening','price_kids'];
+        $stmt = $db->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+        foreach ($keys as $k) {
+            if (isset($input[$k])) {
+                $stmt->execute([$k, (string)(int)$input[$k]]);
+            }
+        }
+        jsonResponse(['success' => true, 'message' => 'Đã lưu bảng giá']);
+        break;
+
     // GET: Lấy cấu hình ngân hàng
     case 'get_bank':
         requireAdmin();

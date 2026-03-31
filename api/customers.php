@@ -124,6 +124,61 @@ switch ($action) {
         jsonResponse(['success' => true, 'data' => $updated->fetch()]);
         break;
 
+    // POST (admin): Cập nhật thông tin thành viên
+    case 'update_customer':
+        $input = getJsonInput();
+        if (($input['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) jsonResponse(['error' => 'Unauthorized'], 401);
+        $phone = sanitizePhone($input['phone'] ?? '');
+        if (!$phone) jsonResponse(['error' => 'Thiếu số điện thoại'], 400);
+        $db = getDB();
+        $custStmt = $db->prepare("SELECT * FROM customers WHERE phone = ?");
+        $custStmt->execute([$phone]);
+        $cust = $custStmt->fetch();
+        if (!$cust) jsonResponse(['error' => 'Không tìm thấy khách hàng'], 404);
+
+        $name     = trim($input['name'] ?? $cust['name']);
+        $email    = trim($input['email'] ?? $cust['email'] ?? '');
+        $sessions = isset($input['sessions']) ? max(0, (int)$input['sessions']) : (int)$cust['sessions'];
+        $maxSess  = isset($input['max_sessions']) ? max(0, (int)$input['max_sessions']) : (int)$cust['max_sessions'];
+        $expiry   = $input['expires_at'] ?? $cust['expires_at'];
+
+        if (!$name) jsonResponse(['error' => 'Tên không được để trống'], 400);
+
+        $db->prepare("UPDATE customers SET name = ?, email = ?, sessions = ?, max_sessions = ?, expires_at = ? WHERE phone = ?")
+           ->execute([$name, $email ?: null, $sessions, $maxSess, $expiry ?: null, $phone]);
+
+        $updated = $db->prepare("SELECT * FROM customers WHERE phone = ?");
+        $updated->execute([$phone]);
+        jsonResponse(['success' => true, 'data' => $updated->fetch()]);
+        break;
+
+    // GET (admin): Xuất CSV danh sách thành viên
+    case 'export_csv':
+        if (($_GET['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) { http_response_code(401); echo 'Unauthorized'; exit; }
+        $db = getDB();
+        $customers = $db->query("SELECT name, phone, email, sessions, max_sessions, expires_at, created_at FROM customers ORDER BY name ASC")->fetchAll();
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="wonder_members_' . date('Ymd_His') . '.csv"');
+
+        $bom = "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
+        $out = fopen('php://output', 'w');
+        fwrite($out, $bom);
+        fputcsv($out, ['Họ tên', 'Số điện thoại', 'Email', 'Buổi còn lại', 'Tổng buổi', 'Hết hạn', 'Ngày đăng ký']);
+        foreach ($customers as $c) {
+            fputcsv($out, [
+                $c['name'],
+                $c['phone'],
+                $c['email'] ?? '',
+                $c['sessions'],
+                $c['max_sessions'],
+                $c['expires_at'] ?? '',
+                $c['created_at'],
+            ]);
+        }
+        fclose($out);
+        exit;
+
     case 'all':
         if (($_GET['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) jsonResponse(['error' => 'Unauthorized'], 401);
         $db = getDB();
