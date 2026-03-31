@@ -21,6 +21,40 @@ function requireAdmin(): void {
 
 switch ($action) {
 
+    // GET: Lấy tất cả settings 1 lần (smtp + bank + pricing)
+    case 'get_all':
+        requireAdmin();
+        $db = getDB();
+        $rows = $db->query("SELECT setting_key, setting_value FROM app_settings")->fetchAll();
+        $all = array_column($rows, 'setting_value', 'setting_key');
+
+        // SMTP
+        $smtp = [];
+        foreach ($all as $k => $v) { if (str_starts_with($k, 'smtp_')) $smtp[$k] = $v; }
+        $smtp['smtp_pass_set'] = !empty($smtp['smtp_pass']);
+        $smtp['smtp_pass'] = '';
+
+        // Bank
+        $bank = [
+            'bank_id'      => $all['bank_id'] ?? BANK_ID,
+            'bank_account' => $all['bank_account'] ?? BANK_ACCOUNT,
+            'bank_owner'   => $all['bank_owner'] ?? BANK_OWNER,
+            'bank_name'    => $all['bank_name'] ?? BANK_NAME,
+        ];
+
+        // Pricing
+        $pricing = [
+            'price_pkg_10'         => (int)($all['price_pkg_10'] ?? PRICE_PKG_10),
+            'price_pkg_30'         => (int)($all['price_pkg_30'] ?? PRICE_PKG_30),
+            'price_social_morning' => (int)($all['price_social_morning'] ?? PRICE_SOCIAL_MORNING),
+            'price_social_noon'    => (int)($all['price_social_noon'] ?? PRICE_SOCIAL_NOON),
+            'price_social_evening' => (int)($all['price_social_evening'] ?? PRICE_SOCIAL_EVENING),
+            'price_kids'           => (int)($all['price_kids'] ?? PRICE_KIDS),
+        ];
+
+        jsonResponse(['success' => true, 'smtp' => $smtp, 'bank' => $bank, 'pricing' => $pricing]);
+        break;
+
     // GET: Lấy toàn bộ settings SMTP (admin)
     case 'get_smtp':
         requireAdmin();
