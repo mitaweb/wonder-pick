@@ -624,12 +624,14 @@ function adminLogout() {
 
 async function loadDashboard() {
   try {
-    const [custRes, ordRes] = await Promise.all([
+    const [custRes, ordRes, setRes] = await Promise.all([
       fetch(`${API_BASE}?action=all&admin_token=${adminToken}`),
-      fetch(`${API_ORDERS}?action=list&admin_token=${adminToken}`)
+      fetch(`${API_ORDERS}?action=list&admin_token=${adminToken}`),
+      fetch(`${API_SET}?action=get_all&admin_token=${adminToken}`)
     ]);
     const custJ = await custRes.json();
     const ordJ  = await ordRes.json();
+    const setJ  = await setRes.json();
 
     if (custJ.error) { showAlert('login-alert', custJ.error==='Unauthorized'?'Mật khẩu không đúng':custJ.error,'error'); adminToken=null; return; }
 
@@ -644,7 +646,6 @@ async function loadDashboard() {
     document.getElementById('stat-today').textContent  = custJ.stats.checkins_today;
     document.getElementById('stat-pending').textContent = pending;
 
-    // Badge on tab
     const badge = document.getElementById('orders-badge');
     if (pending > 0) { badge.textContent = pending; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
@@ -652,14 +653,11 @@ async function loadDashboard() {
     renderOrders(allOrders);
     renderTable(allCustomers);
 
-    // Auto-refresh orders every 15s
     clearInterval(autoRefreshTimer);
     autoRefreshTimer = setInterval(silentRefreshOrders, 15000);
 
-    // Load SMTP settings
-    loadSmtpSettings();
-    loadBankSettings();
-    loadPricing();
+    // Apply settings (đã load song song)
+    if (setJ.success) applyAllSettings(setJ);
   } catch(e) {
     showAlert('login-alert','Lỗi kết nối server','error');
   }
@@ -921,6 +919,41 @@ function exportMembers() {
 }
 
 // ---- SMTP ----
+// ---- ALL SETTINGS (1 call thay vì 3) ----
+function applyAllSettings(json) {
+  // SMTP
+  const s = json.smtp || {};
+  document.getElementById('smtp-host').value = s.smtp_host || 'smtp.gmail.com';
+  document.getElementById('smtp-port').value = s.smtp_port || 587;
+  document.getElementById('smtp-user').value = s.smtp_user || '';
+  document.getElementById('smtp-from-name').value = s.smtp_from_name || 'Wonder Pickleball';
+  if (s.smtp_pass_set) document.getElementById('smtp-pass-hint').textContent = '✓ Mật khẩu đã được lưu. Điền lại nếu muốn thay đổi.';
+  // Bank
+  const b = json.bank || {};
+  bankData = b;
+  document.getElementById('bank-id').value = b.bank_id || '';
+  document.getElementById('bank-account').value = b.bank_account || '';
+  document.getElementById('bank-owner').value = b.bank_owner || '';
+  document.getElementById('bank-name').value = b.bank_name || '';
+  document.getElementById('oqr-bank-info').textContent = (b.bank_account||'') + ' (' + (b.bank_name||'') + ')';
+  // Pricing
+  const p = json.pricing || {};
+  document.getElementById('price-pkg10').value = p.price_pkg_10 || 0;
+  document.getElementById('price-pkg30').value = p.price_pkg_30 || 0;
+  document.getElementById('price-morning').value = p.price_social_morning || 0;
+  document.getElementById('price-noon').value = p.price_social_noon || 0;
+  document.getElementById('price-evening').value = p.price_social_evening || 0;
+  document.getElementById('price-kids').value = p.price_kids || 0;
+}
+
+async function loadAllSettings() {
+  try {
+    const res = await fetch(`${API_SET}?action=get_all&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.success) applyAllSettings(json);
+  } catch(e) {}
+}
+
 async function loadSmtpSettings() {
   try {
     const res=await fetch(`${API_SET}?action=get_smtp&admin_token=${adminToken}`);
@@ -949,7 +982,7 @@ async function saveSmtp() {
     const res=await fetch(`${API_SET}?action=save_smtp`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const json=await res.json();
     if(json.error){showAlert('smtp-alert',json.error,'error');}
-    else{showAlert('smtp-alert','✓ Đã lưu cấu hình SMTP','success');document.getElementById('smtp-pass').value='';loadSmtpSettings();}
+    else{showAlert('smtp-alert','✓ Đã lưu cấu hình SMTP','success');document.getElementById('smtp-pass').value='';loadAllSettings();}
   }catch(e){showAlert('smtp-alert','Lỗi kết nối','error');}
 }
 
@@ -999,7 +1032,7 @@ async function saveBank() {
     const res = await fetch(`${API_SET}?action=save_bank`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
     const json = await res.json();
     if (json.error) showAlert('bank-alert', json.error, 'error');
-    else { showAlert('bank-alert','✓ Đã lưu thông tin ngân hàng','success'); loadBankSettings(); }
+    else { showAlert('bank-alert','✓ Đã lưu thông tin ngân hàng','success'); loadAllSettings(); }
   } catch(e) { showAlert('bank-alert','Lỗi kết nối','error'); }
 }
 
