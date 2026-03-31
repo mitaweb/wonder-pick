@@ -20,11 +20,25 @@ switch ($action) {
 
     case 'list':
         requireAdmin();
-        $rows = getDB()->query("SELECT id, image_path, link_url, created_at FROM banners ORDER BY created_at DESC")->fetchAll();
+        try {
+            $rows = getDB()->query("SELECT id, image_path, link_url, created_at FROM banners ORDER BY created_at DESC")->fetchAll();
+        } catch (\Throwable $e) {
+            // Table might not exist yet — auto-create
+            getDB()->exec("CREATE TABLE IF NOT EXISTS banners (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                image_path VARCHAR(255) NOT NULL,
+                link_url VARCHAR(500) DEFAULT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_sort (sort_order, created_at)
+            ) ENGINE=InnoDB");
+            $rows = [];
+        }
         foreach ($rows as &$r) {
             $r['image_url'] = $uploadUrl . basename($r['image_path']);
         }
         jsonResponse(['banners' => $rows]);
+        break;
 
     case 'create':
         requireAdmin();
@@ -60,6 +74,7 @@ switch ($action) {
         $id = (int)getDB()->lastInsertId();
 
         jsonResponse(['success' => true, 'id' => $id, 'image_url' => $uploadUrl . $filename]);
+        break;
 
     case 'delete':
         requireAdmin();
@@ -78,6 +93,7 @@ switch ($action) {
 
         getDB()->prepare("DELETE FROM banners WHERE id = ?")->execute([$id]);
         jsonResponse(['success' => true]);
+        break;
 
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);

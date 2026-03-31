@@ -10,26 +10,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $action = $_GET['action'] ?? '';
 
-// Tính tiền + buổi theo gói
+// Tính tiền + buổi theo gói (đọc giá từ DB, fallback config)
 function calcOrder(string $pkg, int $kids): array {
     $sessions = 0; $amount = 0; $label = '';
     switch ($pkg) {
         case 'pkg_10':
-            $sessions = 13; $amount = PRICE_PKG_10;
+            $sessions = 13; $amount = getPrice('price_pkg_10');
             $label = 'Gói 10 tặng 3 (13 buổi)'; break;
         case 'pkg_30':
-            $sessions = 40; $amount = PRICE_PKG_30;
+            $sessions = 40; $amount = getPrice('price_pkg_30');
             $label = 'Gói 30 tặng 10 (40 buổi)'; break;
         case 'single':
-            $s = getCurrentSinglePrice();
+            $s = getCurrentSinglePriceDynamic();
             $sessions = 1; $amount = $s['price'];
             $label = 'Lẻ 1 buổi (' . $s['slot'] . ')'; break;
         case 'kids':
-            // Mua riêng khu vui chơi trẻ em
             $sessions = 0; $amount = 0;
             $label = 'Khu vui chơi trẻ em'; break;
     }
-    $kidsAmount = $kids * PRICE_KIDS;
+    $kidsAmount = $kids * getPrice('price_kids');
     $amount += $kidsAmount;
     if ($kids > 0 && $pkg !== 'kids') $label .= ' + ' . $kids . ' trẻ em (khu vui chơi)';
     elseif ($pkg === 'kids') $label = $kids . ' trẻ em — Khu vui chơi';

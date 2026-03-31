@@ -110,6 +110,34 @@ function calcExpiry(string $pkg, ?string $currentExpiry = null): string {
 }
 
 
+// ---- Lấy giá từ DB (fallback config) ----
+function getPrice(string $key): int {
+    $map = [
+        'price_pkg_10'         => PRICE_PKG_10,
+        'price_pkg_30'         => PRICE_PKG_30,
+        'price_social_morning' => PRICE_SOCIAL_MORNING,
+        'price_social_noon'    => PRICE_SOCIAL_NOON,
+        'price_social_evening' => PRICE_SOCIAL_EVENING,
+        'price_kids'           => PRICE_KIDS,
+    ];
+    $val = getSetting($key, '');
+    return $val !== '' ? (int)$val : ($map[$key] ?? 0);
+}
+
+// Lấy giá lẻ theo giờ hiện tại (từ DB)
+function getCurrentSinglePriceDynamic(): array {
+    $hour = (int)date('G');
+    if ($hour >= 8 && $hour < 11) {
+        return ['price' => getPrice('price_social_morning'), 'slot' => '8h - 11h', 'label' => 'Sáng'];
+    } elseif ($hour >= 11 && $hour < 16) {
+        return ['price' => getPrice('price_social_noon'), 'slot' => '11h - 16h', 'label' => 'Trưa'];
+    } elseif ($hour >= 16 && $hour < 22) {
+        return ['price' => getPrice('price_social_evening'), 'slot' => '16h - 22h', 'label' => 'Chiều/Tối'];
+    } else {
+        return ['price' => getPrice('price_social_evening'), 'slot' => 'Ngoài giờ', 'label' => 'Đặc biệt'];
+    }
+}
+
 // ---- Lấy thông tin ngân hàng (DB → fallback config) ----
 function getBankConfig(): array {
     return [

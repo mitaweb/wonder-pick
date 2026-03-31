@@ -173,27 +173,27 @@ $uploadBase = rtrim(APP_URL, '/') . '/uploads/banners/';
       <h3>💰 Bảng giá nhanh</h3>
       <div class="price-row">
         <span>Gói 10 tặng 3 (13 buổi, 1 tháng)</span>
-        <span class="price-value"><?= number_format(PRICE_PKG_10) ?>đ</span>
+        <span class="price-value"><?= number_format(getPrice('price_pkg_10')) ?>đ</span>
       </div>
       <div class="price-row">
         <span>Gói 30 tặng 10 (40 buổi, 3 tháng)</span>
-        <span class="price-value"><?= number_format(PRICE_PKG_30) ?>đ</span>
+        <span class="price-value"><?= number_format(getPrice('price_pkg_30')) ?>đ</span>
       </div>
       <div class="price-row">
         <span>Lẻ sáng (8h-11h)</span>
-        <span class="price-value"><?= number_format(PRICE_SOCIAL_MORNING) ?>đ</span>
+        <span class="price-value"><?= number_format(getPrice('price_social_morning')) ?>đ</span>
       </div>
       <div class="price-row">
         <span>Lẻ trưa (11h-16h)</span>
-        <span class="price-value"><?= number_format(PRICE_SOCIAL_NOON) ?>đ</span>
+        <span class="price-value"><?= number_format(getPrice('price_social_noon')) ?>đ</span>
       </div>
       <div class="price-row">
         <span>Lẻ chiều/tối (16h-22h)</span>
-        <span class="price-value"><?= number_format(PRICE_SOCIAL_EVENING) ?>đ</span>
+        <span class="price-value"><?= number_format(getPrice('price_social_evening')) ?>đ</span>
       </div>
       <div class="price-row">
         <span>🎠 Khu vui chơi trẻ em</span>
-        <span class="price-value"><?= number_format(PRICE_KIDS) ?>đ/trẻ</span>
+        <span class="price-value"><?= number_format(getPrice('price_kids')) ?>đ/trẻ</span>
       </div>
     </div>
 

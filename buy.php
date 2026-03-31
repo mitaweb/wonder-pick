@@ -58,9 +58,9 @@
     <div class="form-card">
       <div class="section-title">Giá lẻ theo khung giờ</div>
       <div class="slot-grid">
-        <div class="slot-card" id="slot-0"><div class="slot-time">8h – 11h</div><div class="slot-price"><?= number_format(PRICE_SOCIAL_MORNING) ?>đ</div><div class="slot-label">Sáng</div></div>
-        <div class="slot-card" id="slot-1"><div class="slot-time">11h – 16h</div><div class="slot-price"><?= number_format(PRICE_SOCIAL_NOON) ?>đ</div><div class="slot-label">Trưa</div></div>
-        <div class="slot-card" id="slot-2"><div class="slot-time">16h – 22h</div><div class="slot-price"><?= number_format(PRICE_SOCIAL_EVENING) ?>đ</div><div class="slot-label">Chiều/Tối</div></div>
+        <div class="slot-card" id="slot-0"><div class="slot-time">8h – 11h</div><div class="slot-price"><?= number_format(getPrice('price_social_morning')) ?>đ</div><div class="slot-label">Sáng</div></div>
+        <div class="slot-card" id="slot-1"><div class="slot-time">11h – 16h</div><div class="slot-price"><?= number_format(getPrice('price_social_noon')) ?>đ</div><div class="slot-label">Trưa</div></div>
+        <div class="slot-card" id="slot-2"><div class="slot-time">16h – 22h</div><div class="slot-price"><?= number_format(getPrice('price_social_evening')) ?>đ</div><div class="slot-label">Chiều/Tối</div></div>
       </div>
       <div id="current-slot-info" style="font-size:13px;color:var(--text2);text-align:center;margin-top:-8px"></div>
     </div>
@@ -96,20 +96,20 @@
           <div class="pkg-sessions">13</div>
           <div class="pkg-name">Gói 10 tặng 3</div>
           <div class="pkg-desc">HSD: 1 tháng</div>
-          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(PRICE_PKG_10) ?>đ</div>
+          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(getPrice('price_pkg_10')) ?>đ</div>
         </div>
         <div class="pkg-card" onclick="selectPkg(this,'pkg_30')" id="opt-pkg30">
           <div class="pkg-sessions">40</div>
           <div class="pkg-name">Gói 30 tặng 10</div>
           <div class="pkg-desc">HSD: 3 tháng</div>
-          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(PRICE_PKG_30) ?>đ</div>
+          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(getPrice('price_pkg_30')) ?>đ</div>
         </div>
       </div>
       <div class="pkg-row" style="grid-template-columns:1fr">
         <div class="pkg-card" onclick="selectPkg(this,'single')" id="opt-single">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><div class="pkg-name">Lẻ 1 buổi</div><div class="pkg-desc">Giờ hiện tại: <?= getCurrentSinglePrice()['slot'] ?></div></div>
-            <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(getCurrentSinglePrice()['price']) ?>đ</div>
+            <div><div class="pkg-name">Lẻ 1 buổi</div><div class="pkg-desc">Giờ hiện tại: <?= getCurrentSinglePriceDynamic()['slot'] ?></div></div>
+            <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(getCurrentSinglePriceDynamic()['price']) ?>đ</div>
           </div>
         </div>
       </div>
@@ -119,7 +119,7 @@
         <div class="pkg-card" onclick="selectPkg(this,'kids')" id="opt-kids">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><div class="pkg-name">🎠 Khu vui chơi trẻ em</div><div class="pkg-desc">Không giới hạn giờ · Chọn số trẻ bên dưới</div></div>
-            <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(PRICE_KIDS) ?>đ/trẻ</div>
+            <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(getPrice('price_kids')) ?>đ/trẻ</div>
           </div>
         </div>
       </div>
@@ -128,7 +128,7 @@
       <div class="kids-row" id="kids-row" style="display:none">
         <div>
           <div style="font-weight:500;font-size:14px">Số trẻ em</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(PRICE_KIDS) ?>đ / trẻ</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px"><?= number_format(getPrice('price_kids')) ?>đ / trẻ</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
@@ -211,9 +211,9 @@
 
 <script src="assets/js/app.js"></script>
 <script>
-const PRICES = { pkg_10:<?= PRICE_PKG_10 ?>, pkg_30:<?= PRICE_PKG_30 ?>, kids:<?= PRICE_KIDS ?> };
-const SINGLE_PRICE = <?= getCurrentSinglePrice()['price'] ?>;
-const SINGLE_SLOT  = '<?= getCurrentSinglePrice()['slot'] ?>';
+const PRICES = { pkg_10:<?= getPrice('price_pkg_10') ?>, pkg_30:<?= getPrice('price_pkg_30') ?>, kids:<?= getPrice('price_kids') ?> };
+const SINGLE_PRICE = <?= getCurrentSinglePriceDynamic()['price'] ?>;
+const SINGLE_SLOT  = '<?= getCurrentSinglePriceDynamic()['slot'] ?>';
 let selectedPkg = 'pkg_10';
 let kidsCount = 0;
 let currentOrderCode = '';
