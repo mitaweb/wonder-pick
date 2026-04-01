@@ -10,29 +10,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $action = $_GET['action'] ?? '';
 
-// Tính tiền + buổi theo gói (đọc giá từ DB, fallback config)
+// Tính tiền + buổi theo gói (đọc từ DB packages, fallback config)
 function calcOrder(string $pkg, int $kids): array {
-    $sessions = 0; $amount = 0; $label = '';
-    switch ($pkg) {
-        case 'pkg_10':
-            $sessions = 13; $amount = getPrice('price_pkg_10');
-            $label = 'Gói 10 tặng 3 (13 buổi)'; break;
-        case 'pkg_30':
-            $sessions = 40; $amount = getPrice('price_pkg_30');
-            $label = 'Gói 30 tặng 10 (40 buổi)'; break;
-        case 'single':
-            $s = getCurrentSinglePriceDynamic();
-            $sessions = 1; $amount = $s['price'];
-            $label = 'Lẻ 1 buổi (' . $s['slot'] . ')'; break;
-        case 'kids':
-            $sessions = 0; $amount = 0;
-            $label = 'Khu vui chơi trẻ em'; break;
+    $sessions = 0; $amount = 0; $label = ''; $expiryDays = 0;
+
+    if ($pkg === 'single') {
+        $s = getCurrentSinglePriceDynamic();
+        $sessions = 1; $amount = $s['price'];
+        $label = 'Lẻ 1 buổi (' . $s['slot'] . ')';
+    } elseif ($pkg === 'kids') {
+        $sessions = 0; $amount = 0;
+        $label = 'Khu vui chơi trẻ em';
+    } else {
+        // Look up from packages table by slug
+        $packages = getPackages();
+        $found = null;
+        foreach ($packages as $p) {
+            if ($p['slug'] === $pkg) { $found = $p; break; }
+        }
+        if ($found) {
+            $sessions = (int)$found['sessions'];
+            $amount = (int)$found['price'];
+            $label = $found['name'] . ' (' . $sessions . ' buổi)';
+            $expiryDays = (int)$found['expiry_days'];
+        } else {
+            // Fallback for legacy slugs
+            if ($pkg === 'pkg_10') { $sessions = 13; $amount = getPrice('price_pkg_10'); $label = 'Gói 10 tặng 3 (13 buổi)'; $expiryDays = 30; }
+            elseif ($pkg === 'pkg_30') { $sessions = 40; $amount = getPrice('price_pkg_30'); $label = 'Gói 30 tặng 10 (40 buổi)'; $expiryDays = 90; }
+        }
     }
+
     $kidsAmount = $kids * getPrice('price_kids');
     $amount += $kidsAmount;
     if ($kids > 0 && $pkg !== 'kids') $label .= ' + ' . $kids . ' trẻ em (khu vui chơi)';
     elseif ($pkg === 'kids') $label = $kids . ' trẻ em — Khu vui chơi';
-    return ['sessions' => $sessions, 'amount' => $amount, 'label' => $label, 'kids_amount' => $kidsAmount];
+    return ['sessions' => $sessions, 'amount' => $amount, 'label' => $label, 'kids_amount' => $kidsAmount, 'expiry_days' => $expiryDays];
 }
 
 switch ($action) {
@@ -104,16 +116,27 @@ switch ($action) {
 
     // GET: Lấy giá hiện tại (cho UI)
     case 'pricing':
-        $s = getCurrentSinglePrice();
+        $s = getCurrentSinglePriceDynamic();
+        $packages = getPackages();
+        $pkgList = [];
+        foreach ($packages as $p) {
+            $pkgList[] = [
+                'slug' => $p['slug'],
+                'name' => $p['name'],
+                'sessions' => (int)$p['sessions'],
+                'price' => (int)$p['price'],
+                'expiry_days' => (int)$p['expiry_days'],
+                'badge' => $p['badge'],
+            ];
+        }
         jsonResponse([
             'single' => $s,
-            'pkg_10' => ['sessions'=>13,'price'=>PRICE_PKG_10,'label'=>'Gói 10 tặng 3'],
-            'pkg_30' => ['sessions'=>40,'price'=>PRICE_PKG_30,'label'=>'Gói 30 tặng 10'],
-            'kids'   => ['price'=>PRICE_KIDS],
+            'packages' => $pkgList,
+            'kids'   => ['price' => getPrice('price_kids')],
             'slots'  => [
-                ['time'=>'8h-11h',  'price'=>PRICE_SOCIAL_MORNING,'label'=>'Sáng'],
-                ['time'=>'11h-16h', 'price'=>PRICE_SOCIAL_NOON,   'label'=>'Trưa'],
-                ['time'=>'16h-22h', 'price'=>PRICE_SOCIAL_EVENING,'label'=>'Chiều/Tối'],
+                ['time'=>'8h-11h',  'price'=>getPrice('price_social_morning'),'label'=>'Sáng'],
+                ['time'=>'11h-16h', 'price'=>getPrice('price_social_noon'),   'label'=>'Trưa'],
+                ['time'=>'16h-22h', 'price'=>getPrice('price_social_evening'),'label'=>'Chiều/Tối'],
             ],
         ]);
         break;
@@ -161,16 +184,35 @@ switch ($action) {
 
             // Cộng buổi nếu có (không cộng với kids_only)
             if ($sessions > 0) {
+                // Tìm expiry_days từ packages table
+                $expiryDays = 0;
+                $packages = getPackages();
+                foreach ($packages as $p) {
+                    if ($p['slug'] === $pkg) { $expiryDays = (int)$p['expiry_days']; break; }
+                }
+                // Fallback for legacy
+                if (!$expiryDays && $pkg === 'pkg_10') $expiryDays = 30;
+                if (!$expiryDays && $pkg === 'pkg_30') $expiryDays = 90;
+
                 $cust = $db->prepare("SELECT * FROM customers WHERE phone=?");
                 $cust->execute([$phone]); $customer = $cust->fetch();
 
                 if ($customer) {
-                    $newExp = in_array($pkg,['pkg_10','pkg_30']) ? calcExpiry($pkg, $customer['expires_at']) : $customer['expires_at'];
+                    $newExp = $customer['expires_at'];
+                    if ($expiryDays > 0) {
+                        $base = ($newExp && strtotime($newExp) > time()) ? new DateTime($newExp) : new DateTime();
+                        $base->modify('+' . $expiryDays . ' days');
+                        $newExp = $base->format('Y-m-d');
+                    }
                     $db->prepare("UPDATE customers SET sessions=sessions+?, max_sessions=max_sessions+?, expires_at=?, updated_at=NOW() WHERE phone=?")
                        ->execute([$sessions, $sessions, $newExp, $phone]);
                 } else {
-                    // Tự tạo tài khoản nếu chưa có
-                    $newExp = in_array($pkg,['pkg_10','pkg_30']) ? calcExpiry($pkg) : null;
+                    $newExp = null;
+                    if ($expiryDays > 0) {
+                        $base = new DateTime();
+                        $base->modify('+' . $expiryDays . ' days');
+                        $newExp = $base->format('Y-m-d');
+                    }
                     $db->prepare("INSERT INTO customers (phone,name,sessions,max_sessions,pkg,expires_at) VALUES (?,?,?,?,?,?)")
                        ->execute([$phone, $order['customer_name'], $sessions, $sessions, $pkg, $newExp]);
                 }

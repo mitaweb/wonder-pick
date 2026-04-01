@@ -171,14 +171,13 @@ $uploadBase = rtrim(APP_URL, '/') . '/uploads/banners/';
     <!-- Quick Pricing -->
     <div class="pricing-quick">
       <h3>💰 Bảng giá nhanh</h3>
+      <?php $homePackages = getPackages(); ?>
+      <?php foreach ($homePackages as $pkg): ?>
       <div class="price-row">
-        <span>Gói 10 tặng 3 (13 buổi, 1 tháng)</span>
-        <span class="price-value"><?= number_format(getPrice('price_pkg_10')) ?>đ</span>
+        <span><?= htmlspecialchars($pkg['name']) ?> (<?= (int)$pkg['sessions'] ?> buổi, <?= (int)$pkg['expiry_days'] ?> ngày)</span>
+        <span class="price-value"><?= number_format((int)$pkg['price']) ?>đ</span>
       </div>
-      <div class="price-row">
-        <span>Gói 30 tặng 10 (40 buổi, 3 tháng)</span>
-        <span class="price-value"><?= number_format(getPrice('price_pkg_30')) ?>đ</span>
-      </div>
+      <?php endforeach; ?>
       <div class="price-row">
         <span>Lẻ sáng (8h-11h)</span>
         <span class="price-value"><?= number_format(getPrice('price_social_morning')) ?>đ</span>

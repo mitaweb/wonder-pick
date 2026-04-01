@@ -396,17 +396,15 @@
             <div style="font-size:12px;color:var(--text2)">Thay đổi giá sẽ áp dụng cho đơn hàng mới</div>
           </div>
           <div id="pricing-alert" class="alert hidden"></div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--green-dark)">Gói thẻ</div>
-          <div class="smtp-row">
-            <div class="form-group" style="margin:0">
-              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gói 10 tặng 3 (13 buổi, 1 tháng)</label>
-              <input type="number" id="price-pkg10" class="form-input" style="font-size:13px" min="0" step="10000">
-            </div>
-            <div class="form-group" style="margin:0">
-              <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Gói 30 tặng 10 (40 buổi, 3 tháng)</label>
-              <input type="number" id="price-pkg30" class="form-input" style="font-size:13px" min="0" step="10000">
-            </div>
+
+          <!-- Dynamic Packages -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:500;color:var(--green-dark)">Gói thẻ tập</div>
+            <button class="btn btn-outline" style="font-size:12px;padding:5px 12px" onclick="openPkgModal()">+ Thêm gói</button>
           </div>
+          <div id="pkg-list" style="margin-bottom:16px"></div>
+          <div id="pkg-list-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px;background:var(--bg2);border-radius:var(--radius);margin-bottom:16px">Chưa có gói tập nào</div>
+
           <div style="font-size:13px;font-weight:500;margin-bottom:8px;margin-top:12px;color:var(--green-dark)">Giá lẻ theo khung giờ</div>
           <div class="smtp-row">
             <div class="form-group" style="margin:0">
@@ -495,13 +493,8 @@
     <button class="modal-close" onclick="closeAddModal()">✕</button>
     <div class="modal-title">Cộng buổi tập</div>
     <div id="add-modal-info" class="add-modal-info"></div>
-    <div class="pkg-grid" style="margin-bottom:14px">
-      <div class="pkg-card selected" onclick="selectAddPkg(this,'pkg_10',13)" id="add-pkg-1">
-        <div class="pkg-badge">Phổ biến</div><div class="pkg-sessions">+13</div><div class="pkg-name">Gói 10 tặng 3</div>
-      </div>
-      <div class="pkg-card" onclick="selectAddPkg(this,'single',1)" id="add-pkg-2">
-        <div class="pkg-sessions" style="font-size:28px">+1</div><div class="pkg-name">Lẻ 1 buổi</div>
-      </div>
+    <div class="pkg-grid" style="margin-bottom:14px" id="add-pkg-grid">
+      <!-- Dynamic packages rendered by JS -->
     </div>
     <div class="form-group">
       <label>Hoặc nhập số buổi tùy ý</label>
@@ -570,6 +563,48 @@
     </table>
     <div style="margin-top:12px">
       <button class="btn btn-primary btn-full" onclick="approveFromQR()" id="oqr-approve-btn">✓ Duyệt đơn hàng này</button>
+    </div>
+  </div>
+</div>
+
+<!-- Package Add/Edit Modal -->
+<div id="pkg-modal" class="modal-overlay hidden" onclick="if(event.target===this)closePkgModal()">
+  <div class="modal" style="max-width:440px">
+    <button class="modal-close" onclick="closePkgModal()">✕</button>
+    <div class="modal-title" id="pkg-modal-title">Thêm gói tập</div>
+    <input type="hidden" id="pkg-edit-id" value="">
+    <div id="pkg-modal-alert" class="alert hidden"></div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Tên gói</label>
+      <input type="text" id="pkg-name" class="form-input" placeholder="VD: Gói 10 tặng 3">
+    </div>
+    <div class="smtp-row">
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">Số buổi</label>
+        <input type="number" id="pkg-sessions" class="form-input" min="1" placeholder="VD: 13">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">Giá (VNĐ)</label>
+        <input type="number" id="pkg-price" class="form-input" min="0" step="10000" placeholder="VD: 600000">
+      </div>
+    </div>
+    <div class="smtp-row">
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">HSD (ngày)</label>
+        <input type="number" id="pkg-expiry" class="form-input" min="1" value="30" placeholder="30">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label style="font-size:12px;color:var(--text2)">Badge (tùy chọn)</label>
+        <input type="text" id="pkg-badge" class="form-input" placeholder="VD: Phổ biến, Hot...">
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Thứ tự hiển thị</label>
+      <input type="number" id="pkg-sort" class="form-input" min="0" value="0" placeholder="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePkgModal()">Hủy</button>
+      <button class="btn btn-primary" onclick="savePkg()" id="pkg-save-btn">Lưu gói tập</button>
     </div>
   </div>
 </div>
@@ -757,10 +792,11 @@ function renderOrders(orders) {
 }
 
 function pkgLabel(pkg, sessions) {
-  if (pkg==='pkg_10') return 'Gói 10 tặng 3 ('+sessions+' buổi)';
-  if (pkg==='pkg_30') return 'Gói 30 tặng 10 ('+sessions+' buổi)';
   if (pkg==='single') return 'Lẻ 1 buổi';
-  return pkg;
+  if (pkg==='kids') return 'Khu vui chơi trẻ em';
+  const found = allPackages.find(p => p.slug === pkg);
+  if (found) return found.name + ' (' + sessions + ' buổi)';
+  return pkg + ' (' + sessions + ' buổi)';
 }
 
 async function approveOrder(id, code) {
@@ -837,10 +873,26 @@ function filterList(v) {
 }
 
 function openAddModal(phone, name, sessions) {
-  addTargetPhone=phone; addSessions=13; addPkg='pkg_10';
+  addTargetPhone=phone;
   document.getElementById('add-modal-info').innerHTML = `<strong>${name}</strong> — Hiện có <strong>${sessions}</strong> buổi`;
-  document.querySelectorAll('#add-modal .pkg-card').forEach(x=>x.classList.remove('selected'));
-  document.getElementById('add-pkg-1').classList.add('selected');
+  // Render dynamic pkg cards
+  const grid = document.getElementById('add-pkg-grid');
+  let html = '';
+  if (allPackages.length) {
+    html = allPackages.map((p, i) => {
+      const badge = p.badge ? `<div class="pkg-badge">${esc(p.badge)}</div>` : '';
+      return `<div class="pkg-card${i===0?' selected':''}" onclick="selectAddPkg(this,'${esc(p.slug)}',${p.sessions})">
+        ${badge}<div class="pkg-sessions">+${p.sessions}</div><div class="pkg-name">${esc(p.name)}</div>
+      </div>`;
+    }).join('');
+  }
+  html += `<div class="pkg-card${!allPackages.length?' selected':''}" onclick="selectAddPkg(this,'single',1)">
+    <div class="pkg-sessions" style="font-size:28px">+1</div><div class="pkg-name">Lẻ 1 buổi</div>
+  </div>`;
+  grid.innerHTML = html;
+  // Set default
+  if (allPackages.length) { addPkg = allPackages[0].slug; addSessions = allPackages[0].sessions; }
+  else { addPkg = 'single'; addSessions = 1; }
   document.getElementById('custom-sessions').value='';
   document.getElementById('add-note').value='';
   hideAlert('add-modal-alert');
@@ -936,14 +988,14 @@ function applyAllSettings(json) {
   document.getElementById('bank-owner').value = b.bank_owner || '';
   document.getElementById('bank-name').value = b.bank_name || '';
   document.getElementById('oqr-bank-info').textContent = (b.bank_account||'') + ' (' + (b.bank_name||'') + ')';
-  // Pricing
+  // Pricing (slot + kids only)
   const p = json.pricing || {};
-  document.getElementById('price-pkg10').value = p.price_pkg_10 || 0;
-  document.getElementById('price-pkg30').value = p.price_pkg_30 || 0;
   document.getElementById('price-morning').value = p.price_social_morning || 0;
   document.getElementById('price-noon').value = p.price_social_noon || 0;
   document.getElementById('price-evening').value = p.price_social_evening || 0;
   document.getElementById('price-kids').value = p.price_kids || 0;
+  // Packages
+  if (json.packages) renderPackages(json.packages);
 }
 
 async function loadAllSettings() {
@@ -1037,25 +1089,10 @@ async function saveBank() {
 }
 
 // ---- PRICING ----
-async function loadPricing() {
-  try {
-    const res = await fetch(`${API_SET}?action=get_pricing&admin_token=${adminToken}`);
-    const json = await res.json();
-    if (json.data) {
-      document.getElementById('price-pkg10').value = json.data.price_pkg_10 || 0;
-      document.getElementById('price-pkg30').value = json.data.price_pkg_30 || 0;
-      document.getElementById('price-morning').value = json.data.price_social_morning || 0;
-      document.getElementById('price-noon').value = json.data.price_social_noon || 0;
-      document.getElementById('price-evening').value = json.data.price_social_evening || 0;
-      document.getElementById('price-kids').value = json.data.price_kids || 0;
-    }
-  } catch(e) {}
-}
+let allPackages = [];
 
 async function savePricing() {
   const data = {
-    price_pkg_10: parseInt(document.getElementById('price-pkg10').value) || 0,
-    price_pkg_30: parseInt(document.getElementById('price-pkg30').value) || 0,
     price_social_morning: parseInt(document.getElementById('price-morning').value) || 0,
     price_social_noon: parseInt(document.getElementById('price-noon').value) || 0,
     price_social_evening: parseInt(document.getElementById('price-evening').value) || 0,
@@ -1068,6 +1105,94 @@ async function savePricing() {
     if (json.error) showAlert('pricing-alert', json.error, 'error');
     else showAlert('pricing-alert', '✓ Đã lưu bảng giá', 'success');
   } catch(e) { showAlert('pricing-alert','Lỗi kết nối','error'); }
+}
+
+// ---- PACKAGES ----
+function renderPackages(packages) {
+  allPackages = packages || [];
+  const el = document.getElementById('pkg-list');
+  const empty = document.getElementById('pkg-list-empty');
+  if (!allPackages.length) { el.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  el.innerHTML = allPackages.map(p => {
+    const badge = p.badge ? `<span style="display:inline-block;background:var(--green-light);color:var(--green-dark);font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px;margin-left:6px">${esc(p.badge)}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border-radius:var(--radius-lg);margin-bottom:8px;border:0.5px solid var(--border)" id="pkg-item-${p.id}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">${esc(p.name)}${badge}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${p.sessions} buổi · HSD ${p.expiry_days} ngày · ${parseInt(p.price).toLocaleString('vi-VN')}đ</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px" onclick="editPkg(${p.id})">✏ Sửa</button>
+        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;color:var(--red)" onclick="deletePkg(${p.id},'${esc(p.name)}')">Xóa</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openPkgModal(pkg) {
+  document.getElementById('pkg-edit-id').value = pkg ? pkg.id : '';
+  document.getElementById('pkg-modal-title').textContent = pkg ? 'Chỉnh sửa gói tập' : 'Thêm gói tập mới';
+  document.getElementById('pkg-name').value = pkg ? pkg.name : '';
+  document.getElementById('pkg-sessions').value = pkg ? pkg.sessions : '';
+  document.getElementById('pkg-price').value = pkg ? pkg.price : '';
+  document.getElementById('pkg-expiry').value = pkg ? pkg.expiry_days : 30;
+  document.getElementById('pkg-badge').value = pkg ? (pkg.badge || '') : '';
+  document.getElementById('pkg-sort').value = pkg ? pkg.sort_order : 0;
+  hideAlert('pkg-modal-alert');
+  document.getElementById('pkg-modal').classList.remove('hidden');
+}
+
+function closePkgModal() { document.getElementById('pkg-modal').classList.add('hidden'); }
+
+function editPkg(id) {
+  const pkg = allPackages.find(p => p.id == id);
+  if (pkg) openPkgModal(pkg);
+}
+
+async function savePkg() {
+  const id = document.getElementById('pkg-edit-id').value;
+  const data = {
+    name: document.getElementById('pkg-name').value.trim(),
+    sessions: parseInt(document.getElementById('pkg-sessions').value) || 0,
+    price: parseInt(document.getElementById('pkg-price').value) || 0,
+    expiry_days: parseInt(document.getElementById('pkg-expiry').value) || 30,
+    badge: document.getElementById('pkg-badge').value.trim(),
+    sort_order: parseInt(document.getElementById('pkg-sort').value) || 0,
+    admin_token: adminToken
+  };
+  if (id) data.id = parseInt(id);
+
+  const action = id ? 'update_package' : 'create_package';
+  const btn = document.getElementById('pkg-save-btn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    const res = await fetch(`${API_SET}?action=${action}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const json = await res.json();
+    if (json.error) { showAlert('pkg-modal-alert', json.error, 'error'); }
+    else { closePkgModal(); showAlert('pricing-alert', '✓ ' + json.message, 'success'); loadPackages(); }
+  } catch(e) { showAlert('pkg-modal-alert','Lỗi kết nối','error'); }
+  btn.disabled = false; btn.textContent = 'Lưu gói tập';
+}
+
+async function deletePkg(id, name) {
+  if (!confirm(`Xóa gói "${name}"?\nGói sẽ bị ẩn, các đơn hàng cũ không bị ảnh hưởng.`)) return;
+  const el = document.getElementById('pkg-item-'+id);
+  if (el) { el.style.opacity='.4'; el.style.pointerEvents='none'; }
+  try {
+    const res = await fetch(`${API_SET}?action=delete_package`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, admin_token:adminToken})});
+    const json = await res.json();
+    if (json.error) { alert('Lỗi: '+json.error); if(el){el.style.opacity='1';el.style.pointerEvents='';} return; }
+    showAlert('pricing-alert', '✓ Đã xóa gói tập', 'success');
+    loadPackages();
+  } catch(e) { if(el){el.style.opacity='1';el.style.pointerEvents='';} }
+}
+
+async function loadPackages() {
+  try {
+    const res = await fetch(`${API_SET}?action=list_packages&admin_token=${adminToken}`);
+    const json = await res.json();
+    if (json.success) renderPackages(json.packages);
+  } catch(e) {}
 }
 
 // ---- REPORT ----

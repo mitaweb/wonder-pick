@@ -90,23 +90,22 @@
       <input type="hidden" id="buy-phone">
       <input type="hidden" id="buy-name">
 
-      <div class="pkg-row">
-        <div class="pkg-card selected" onclick="selectPkg(this,'pkg_10')" id="opt-pkg10">
-          <div class="pkg-badge">Phổ biến</div>
-          <div class="pkg-sessions">13</div>
-          <div class="pkg-name">Gói 10 tặng 3</div>
-          <div class="pkg-desc">HSD: 1 tháng</div>
-          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(getPrice('price_pkg_10')) ?>đ</div>
+      <?php $buyPackages = getPackages(); ?>
+      <?php if (count($buyPackages) > 0): ?>
+      <div class="pkg-row" style="grid-template-columns:<?= count($buyPackages) > 1 ? '1fr 1fr' : '1fr' ?>">
+        <?php foreach ($buyPackages as $i => $pkg): ?>
+        <div class="pkg-card<?= $i === 0 ? ' selected' : '' ?>" onclick="selectPkg(this,'<?= htmlspecialchars($pkg['slug']) ?>')">
+          <?php if ($pkg['badge']): ?><div class="pkg-badge"><?= htmlspecialchars($pkg['badge']) ?></div><?php endif; ?>
+          <div class="pkg-sessions"><?= (int)$pkg['sessions'] ?></div>
+          <div class="pkg-name"><?= htmlspecialchars($pkg['name']) ?></div>
+          <div class="pkg-desc">HSD: <?= (int)$pkg['expiry_days'] ?> ngày</div>
+          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format((int)$pkg['price']) ?>đ</div>
         </div>
-        <div class="pkg-card" onclick="selectPkg(this,'pkg_30')" id="opt-pkg30">
-          <div class="pkg-sessions">40</div>
-          <div class="pkg-name">Gói 30 tặng 10</div>
-          <div class="pkg-desc">HSD: 3 tháng</div>
-          <div style="margin-top:8px;font-size:16px;font-weight:600;color:var(--green-dark)"><?= number_format(getPrice('price_pkg_30')) ?>đ</div>
-        </div>
+        <?php endforeach; ?>
       </div>
+      <?php endif; ?>
       <div class="pkg-row" style="grid-template-columns:1fr">
-        <div class="pkg-card" onclick="selectPkg(this,'single')" id="opt-single">
+        <div class="pkg-card<?= empty($buyPackages) ? ' selected' : '' ?>" onclick="selectPkg(this,'single')" id="opt-single">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><div class="pkg-name">Lẻ 1 buổi</div><div class="pkg-desc">Giờ hiện tại: <?= getCurrentSinglePriceDynamic()['slot'] ?></div></div>
             <div style="font-size:22px;font-weight:600;color:var(--green)"><?= number_format(getCurrentSinglePriceDynamic()['price']) ?>đ</div>
@@ -211,10 +210,15 @@
 
 <script src="assets/js/app.js"></script>
 <script>
-const PRICES = { pkg_10:<?= getPrice('price_pkg_10') ?>, pkg_30:<?= getPrice('price_pkg_30') ?>, kids:<?= getPrice('price_kids') ?> };
+const PKG_DATA = {
+<?php foreach ($buyPackages as $pkg): ?>
+  '<?= $pkg['slug'] ?>': {price:<?= (int)$pkg['price'] ?>, name:'<?= addslashes($pkg['name']) ?>', sessions:<?= (int)$pkg['sessions'] ?>},
+<?php endforeach; ?>
+};
+const KIDS_PRICE = <?= getPrice('price_kids') ?>;
 const SINGLE_PRICE = <?= getCurrentSinglePriceDynamic()['price'] ?>;
 const SINGLE_SLOT  = '<?= getCurrentSinglePriceDynamic()['slot'] ?>';
-let selectedPkg = 'pkg_10';
+let selectedPkg = '<?= !empty($buyPackages) ? $buyPackages[0]['slug'] : 'single' ?>';
 let kidsCount = 0;
 let currentOrderCode = '';
 
@@ -282,11 +286,13 @@ function selectPkg(el,type){
 }
 function updateTotal(){
   let base=0,bd='';
-  if(selectedPkg==='pkg_10'){base=PRICES.pkg_10;bd='Gói 10+3 = '+PRICES.pkg_10.toLocaleString('vi-VN')+'đ';}
-  else if(selectedPkg==='pkg_30'){base=PRICES.pkg_30;bd='Gói 30+10 = '+PRICES.pkg_30.toLocaleString('vi-VN')+'đ';}
-  else if(selectedPkg==='single'){base=SINGLE_PRICE;bd='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ';}
+  if(selectedPkg==='single'){base=SINGLE_PRICE;bd='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ';}
   else if(selectedPkg==='kids'){base=0;bd='';}
-  const ka=kidsCount*PRICES.kids;
+  else if(PKG_DATA[selectedPkg]){
+    const p=PKG_DATA[selectedPkg];
+    base=p.price; bd=p.name+' = '+p.price.toLocaleString('vi-VN')+'đ';
+  }
+  const ka=kidsCount*KIDS_PRICE;
   if(kidsCount>0) bd+=(bd?' + ':'')+kidsCount+' trẻ = '+ka.toLocaleString('vi-VN')+'đ';
   document.getElementById('total-display').textContent=(base+ka).toLocaleString('vi-VN')+'đ';
   document.getElementById('total-breakdown').textContent=bd;
