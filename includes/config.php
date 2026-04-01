@@ -110,6 +110,40 @@ function calcExpiry(string $pkg, ?string $currentExpiry = null): string {
 }
 
 
+// ---- Lấy danh sách gói tập từ DB ----
+function getPackages(): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    try {
+        $db = getDB();
+        // Auto-create table if not exists
+        $db->exec("CREATE TABLE IF NOT EXISTS packages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            slug VARCHAR(50) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL,
+            sessions INT NOT NULL DEFAULT 0,
+            price INT NOT NULL DEFAULT 0,
+            expiry_days INT NOT NULL DEFAULT 30,
+            badge VARCHAR(50) DEFAULT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB");
+        $rows = $db->query("SELECT * FROM packages WHERE active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll();
+        if (empty($rows)) {
+            // Insert defaults
+            $db->exec("INSERT IGNORE INTO packages (slug, name, sessions, price, expiry_days, badge, sort_order) VALUES
+                ('pkg_10', 'Gói 10 tặng 3', 13, " . PRICE_PKG_10 . ", 30, 'Phổ biến', 1),
+                ('pkg_30', 'Gói 30 tặng 10', 40, " . PRICE_PKG_30 . ", 90, NULL, 2)");
+            $rows = $db->query("SELECT * FROM packages WHERE active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll();
+        }
+        $cache = $rows;
+    } catch (\Throwable $e) {
+        $cache = [];
+    }
+    return $cache;
+}
+
 // ---- Lấy giá từ DB (fallback config) ----
 function getPrice(string $key): int {
     $map = [

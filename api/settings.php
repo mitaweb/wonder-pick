@@ -52,7 +52,10 @@ switch ($action) {
             'price_kids'           => (int)($all['price_kids'] ?? PRICE_KIDS),
         ];
 
-        jsonResponse(['success' => true, 'smtp' => $smtp, 'bank' => $bank, 'pricing' => $pricing]);
+        // Packages
+        $packages = getPackages();
+
+        jsonResponse(['success' => true, 'smtp' => $smtp, 'bank' => $bank, 'pricing' => $pricing, 'packages' => $packages]);
         break;
 
     // GET: Lấy toàn bộ settings SMTP (admin)
@@ -166,6 +169,86 @@ switch ($action) {
             }
         }
         jsonResponse(['success' => true, 'message' => 'Đã lưu thông tin ngân hàng']);
+        break;
+
+    // ============ PACKAGE MANAGEMENT ============
+
+    // GET: Lấy danh sách gói tập (tất cả hoặc chỉ active)
+    case 'list_packages':
+        requireAdmin();
+        $showAll = ($_GET['all'] ?? '') === '1';
+        $packages = getPackages();
+        if ($showAll) {
+            // Trả về cả inactive
+            $packages = getDB()->query("SELECT * FROM packages ORDER BY sort_order ASC, id ASC")->fetchAll();
+        }
+        jsonResponse(['success' => true, 'packages' => $packages]);
+        break;
+
+    // POST: Tạo gói tập mới
+    case 'create_package':
+        requireAdmin();
+        $input = getJsonInput();
+        $name = trim($input['name'] ?? '');
+        $sessions = (int)($input['sessions'] ?? 0);
+        $price = (int)($input['price'] ?? 0);
+        $expiryDays = (int)($input['expiry_days'] ?? 30);
+        $badge = trim($input['badge'] ?? '');
+        $sortOrder = (int)($input['sort_order'] ?? 0);
+
+        if (!$name) jsonResponse(['error' => 'Tên gói không được để trống'], 400);
+        if ($sessions <= 0) jsonResponse(['error' => 'Số buổi phải lớn hơn 0'], 400);
+        if ($price <= 0) jsonResponse(['error' => 'Giá phải lớn hơn 0'], 400);
+
+        // Auto-generate slug
+        $slug = 'pkg_' . time() . '_' . rand(100, 999);
+
+        $db = getDB();
+        // Ensure table exists
+        getPackages();
+
+        $stmt = $db->prepare("INSERT INTO packages (slug, name, sessions, price, expiry_days, badge, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$slug, $name, $sessions, $price, $expiryDays, $badge ?: null, $sortOrder]);
+        $id = (int)$db->lastInsertId();
+
+        jsonResponse(['success' => true, 'id' => $id, 'message' => 'Đã tạo gói tập mới']);
+        break;
+
+    // POST: Cập nhật gói tập
+    case 'update_package':
+        requireAdmin();
+        $input = getJsonInput();
+        $id = (int)($input['id'] ?? 0);
+        if (!$id) jsonResponse(['error' => 'ID không hợp lệ'], 400);
+
+        $name = trim($input['name'] ?? '');
+        $sessions = (int)($input['sessions'] ?? 0);
+        $price = (int)($input['price'] ?? 0);
+        $expiryDays = (int)($input['expiry_days'] ?? 30);
+        $badge = trim($input['badge'] ?? '');
+        $sortOrder = (int)($input['sort_order'] ?? 0);
+
+        if (!$name) jsonResponse(['error' => 'Tên gói không được để trống'], 400);
+        if ($sessions <= 0) jsonResponse(['error' => 'Số buổi phải lớn hơn 0'], 400);
+        if ($price <= 0) jsonResponse(['error' => 'Giá phải lớn hơn 0'], 400);
+
+        $db = getDB();
+        $stmt = $db->prepare("UPDATE packages SET name=?, sessions=?, price=?, expiry_days=?, badge=?, sort_order=? WHERE id=?");
+        $stmt->execute([$name, $sessions, $price, $expiryDays, $badge ?: null, $sortOrder, $id]);
+
+        jsonResponse(['success' => true, 'message' => 'Đã cập nhật gói tập']);
+        break;
+
+    // POST: Xóa (ẩn) gói tập
+    case 'delete_package':
+        requireAdmin();
+        $input = getJsonInput();
+        $id = (int)($input['id'] ?? 0);
+        if (!$id) jsonResponse(['error' => 'ID không hợp lệ'], 400);
+
+        $db = getDB();
+        $db->prepare("UPDATE packages SET active = 0 WHERE id = ?")->execute([$id]);
+        jsonResponse(['success' => true, 'message' => 'Đã xóa gói tập']);
         break;
 
     default:

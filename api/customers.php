@@ -114,7 +114,20 @@ switch ($action) {
         $custStmt->execute([$phone]);
         $cust = $custStmt->fetch();
         if (!$cust) jsonResponse(['error' => 'Không tìm thấy khách hàng'], 404);
-        $newExpiry = in_array($pkg, ['pkg_10','pkg_30']) ? calcExpiry($pkg, $cust['expires_at']) : $cust['expires_at'];
+        // Tìm expiry_days từ packages table
+        $expiryDays = 0;
+        $packages = getPackages();
+        foreach ($packages as $p) {
+            if ($p['slug'] === $pkg) { $expiryDays = (int)$p['expiry_days']; break; }
+        }
+        if (!$expiryDays && $pkg === 'pkg_10') $expiryDays = 30;
+        if (!$expiryDays && $pkg === 'pkg_30') $expiryDays = 90;
+        $newExpiry = $cust['expires_at'];
+        if ($expiryDays > 0) {
+            $base = ($newExpiry && strtotime($newExpiry) > time()) ? new DateTime($newExpiry) : new DateTime();
+            $base->modify('+' . $expiryDays . ' days');
+            $newExpiry = $base->format('Y-m-d');
+        }
         $db->prepare("UPDATE customers SET sessions = sessions + ?, max_sessions = max_sessions + ?, expires_at = ? WHERE phone = ?")
            ->execute([$sessions, $sessions, $newExpiry, $phone]);
         $db->prepare("INSERT INTO session_packages (phone, pkg, sessions_added, added_by, note) VALUES (?, ?, ?, 'admin', ?)")
