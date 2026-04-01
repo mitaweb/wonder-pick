@@ -31,8 +31,8 @@
 /* Payment modal */
 .pay-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
 .pay-box{background:var(--bg);border-radius:var(--radius-xl);padding:24px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.qr-img-wrap{background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px;text-align:center;margin-bottom:14px}
-.qr-img-wrap img{max-width:240px;width:100%;border-radius:8px}
+.qr-img-wrap{background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;text-align:center;margin-bottom:14px;display:flex;flex-direction:column;align-items:center}
+.qr-img-wrap img{max-width:320px;width:100%;border-radius:8px}
 .ck-table td{padding:5px 0;font-size:13px;vertical-align:top}
 .ck-table td:first-child{color:var(--text2);width:110px;white-space:nowrap}
 .ck-table td:last-child{font-weight:500}
