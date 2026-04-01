@@ -72,7 +72,11 @@ function jsonResponse(array $data, int $status = 200): void {
 }
 
 function getJsonInput(): array {
-    return json_decode(file_get_contents('php://input'), true) ?? [];
+    static $cache = null;
+    if ($cache === null) {
+        $cache = json_decode(file_get_contents('php://input'), true) ?? [];
+    }
+    return $cache;
 }
 
 function sanitizePhone(string $phone): string {
