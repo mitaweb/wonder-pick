@@ -132,7 +132,9 @@ function getPackages(): array {
             sort_order INT NOT NULL DEFAULT 0,
             active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Ensure charset for existing tables
+        $db->exec("ALTER TABLE packages CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         $rows = $db->query("SELECT * FROM packages WHERE active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll();
         if (empty($rows)) {
             // Insert defaults
