@@ -109,8 +109,8 @@
 /* Payment overlay */
 .pay-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .pay-box { background: var(--bg); border-radius: var(--radius-xl); padding: 28px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
-.qr-img-wrap { background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; text-align: center; margin-bottom: 16px; }
-.qr-img-wrap img { max-width: 200px; width: 100%; }
+.qr-img-wrap { background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; text-align: center; margin-bottom: 16px; display: flex; flex-direction: column; align-items: center; }
+.qr-img-wrap img { max-width: 320px; width: 100%; }
 .ck-table td { padding: 5px 0; font-size: 13px; }
 .ck-table td:first-child { color: var(--text2); width: 110px; }
 .ck-table td:last-child { font-weight: 500; }
