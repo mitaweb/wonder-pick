@@ -1167,7 +1167,9 @@ async function savePkg() {
   btn.disabled = true; btn.textContent = 'Đang lưu...';
   try {
     const res = await fetch(`${API_SET}?action=${action}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
-    const json = await res.json();
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch(pe) { showAlert('pkg-modal-alert', 'Lỗi server: ' + text.substring(0, 200), 'error'); btn.disabled = false; btn.textContent = 'Lưu gói tập'; return; }
     if (json.error) { showAlert('pkg-modal-alert', json.error, 'error'); }
     else { closePkgModal(); showAlert('pricing-alert', '✓ ' + json.message, 'success'); loadPackages(); }
   } catch(e) { showAlert('pkg-modal-alert','Lỗi kết nối','error'); }
