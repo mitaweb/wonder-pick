@@ -253,35 +253,27 @@
 
       <div id="buy-alert" class="alert hidden"></div>
 
-      <div class="mini-pkg selected" onclick="selectBuyPkg(this,'pkg_10')" id="buy-pkg10">
+      <?php $memberPackages = getPackages(); ?>
+      <?php foreach ($memberPackages as $i => $pkg): ?>
+      <div class="mini-pkg<?= $i === 0 ? ' selected' : '' ?>" onclick="selectBuyPkg(this,'<?= htmlspecialchars($pkg['slug']) ?>')">
         <div class="mini-pkg-left">
-          <div class="mini-pkg-name">Gói 10 tặng 3</div>
-          <div class="mini-pkg-desc">+13 buổi · Hiệu lực 1 tháng</div>
+          <div class="mini-pkg-name"><?= htmlspecialchars($pkg['name']) ?></div>
+          <div class="mini-pkg-desc">+<?= (int)$pkg['sessions'] ?> buổi · Hiệu lực <?= (int)$pkg['expiry_days'] ?> ngày</div>
         </div>
         <div>
-          <div class="mini-pkg-price"><?= number_format(PRICE_PKG_10) ?>đ</div>
-          <div class="mini-pkg-sessions">13 buổi</div>
+          <div class="mini-pkg-price"><?= number_format((int)$pkg['price']) ?>đ</div>
+          <div class="mini-pkg-sessions"><?= (int)$pkg['sessions'] ?> buổi</div>
         </div>
       </div>
-
-      <div class="mini-pkg" onclick="selectBuyPkg(this,'pkg_30')" id="buy-pkg30">
-        <div class="mini-pkg-left">
-          <div class="mini-pkg-name">Gói 30 tặng 10</div>
-          <div class="mini-pkg-desc">+40 buổi · Hiệu lực 3 tháng</div>
-        </div>
-        <div>
-          <div class="mini-pkg-price"><?= number_format(PRICE_PKG_30) ?>đ</div>
-          <div class="mini-pkg-sessions">40 buổi</div>
-        </div>
-      </div>
+      <?php endforeach; ?>
 
       <div class="mini-pkg" onclick="selectBuyPkg(this,'single')" id="buy-single">
         <div class="mini-pkg-left">
           <div class="mini-pkg-name">Lẻ 1 buổi</div>
-          <div class="mini-pkg-desc">Giờ hiện tại: <?= getCurrentSinglePrice()['slot'] ?></div>
+          <div class="mini-pkg-desc">Giờ hiện tại: <?= getCurrentSinglePriceDynamic()['slot'] ?></div>
         </div>
         <div>
-          <div class="mini-pkg-price"><?= number_format(getCurrentSinglePrice()['price']) ?>đ</div>
+          <div class="mini-pkg-price"><?= number_format(getCurrentSinglePriceDynamic()['price']) ?>đ</div>
           <div class="mini-pkg-sessions">1 buổi</div>
         </div>
       </div>
@@ -293,7 +285,7 @@
           <div class="mini-pkg-desc">Không giới hạn giờ · Chọn số trẻ bên dưới</div>
         </div>
         <div>
-          <div class="mini-pkg-price"><?= number_format(PRICE_KIDS) ?>đ/trẻ</div>
+          <div class="mini-pkg-price"><?= number_format(getPrice('price_kids')) ?>đ/trẻ</div>
         </div>
       </div>
 
@@ -301,7 +293,7 @@
       <div class="kids-inline" id="m-kids-row" style="display:none">
         <div class="kids-inline-left">
           <div class="title">Số trẻ em</div>
-          <div class="sub"><?= number_format(PRICE_KIDS) ?>đ / trẻ</div>
+          <div class="sub"><?= number_format(getPrice('price_kids')) ?>đ / trẻ</div>
         </div>
         <div class="kids-counter">
           <button class="counter-btn" onclick="changeKids(-1)">−</button>
@@ -398,12 +390,17 @@
 <script>
 const API_C = 'api/customers.php';
 const API_O = 'api/orders.php';
-const PRICES = { pkg_10: <?= PRICE_PKG_10 ?>, pkg_30: <?= PRICE_PKG_30 ?>, kids: <?= PRICE_KIDS ?> };
-const SINGLE_PRICE = <?= getCurrentSinglePrice()['price'] ?>;
-const SINGLE_SLOT  = '<?= getCurrentSinglePrice()['slot'] ?>';
+const PKG_DATA = {
+<?php foreach ($memberPackages as $pkg): ?>
+  '<?= $pkg['slug'] ?>': {price:<?= (int)$pkg['price'] ?>, name:'<?= addslashes($pkg['name']) ?>', sessions:<?= (int)$pkg['sessions'] ?>},
+<?php endforeach; ?>
+};
+const KIDS_PRICE = <?= getPrice('price_kids') ?>;
+const SINGLE_PRICE = <?= getCurrentSinglePriceDynamic()['price'] ?>;
+const SINGLE_SLOT  = '<?= getCurrentSinglePriceDynamic()['slot'] ?>';
 
 let currentCustomer = null;
-let selectedBuyPkg  = 'pkg_10';
+let selectedBuyPkg  = '<?= !empty($memberPackages) ? $memberPackages[0]['slug'] : 'single' ?>';
 let kidsCount = 0;
 let pollTimer = null;
 let currentOrderId = null;
@@ -546,8 +543,8 @@ function updateSessionsDisplay(c, expired) {
   numEl.textContent = n;
   numEl.className = 'sessions-big-num' + (n===0?' zero':n<=3?' low':'');
 
-  document.getElementById('m-pkg-label').textContent =
-    c.pkg==='pkg_30' ? 'Gói 30 tặng 10' : c.pkg==='pkg_10' ? 'Gói 10 tặng 3' : 'Thẻ tập';
+  const pkgInfo = PKG_DATA[c.pkg];
+  document.getElementById('m-pkg-label').textContent = pkgInfo ? pkgInfo.name : 'Thẻ tập';
 
   const bar = document.getElementById('m-bar');
   bar.style.width = Math.max(0, Math.min(100, Math.round(n/max*100))) + '%';
@@ -673,11 +670,13 @@ function changeKids(d) {
 
 function updateBuyTotal() {
   let base=0, breakdown='';
-  if (selectedBuyPkg==='pkg_10') { base=PRICES.pkg_10; breakdown='Gói 10+3 = '+PRICES.pkg_10.toLocaleString('vi-VN')+'đ'; }
-  else if (selectedBuyPkg==='pkg_30') { base=PRICES.pkg_30; breakdown='Gói 30+10 = '+PRICES.pkg_30.toLocaleString('vi-VN')+'đ'; }
-  else if (selectedBuyPkg==='single') { base=SINGLE_PRICE; breakdown='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ'; }
+  if (selectedBuyPkg==='single') { base=SINGLE_PRICE; breakdown='Lẻ 1 buổi ('+SINGLE_SLOT+') = '+SINGLE_PRICE.toLocaleString('vi-VN')+'đ'; }
   else if (selectedBuyPkg==='kids') { base=0; breakdown=''; }
-  const kidsAmt = kidsCount*PRICES.kids;
+  else if (PKG_DATA[selectedBuyPkg]) {
+    const p=PKG_DATA[selectedBuyPkg];
+    base=p.price; breakdown=p.name+' = '+p.price.toLocaleString('vi-VN')+'đ';
+  }
+  const kidsAmt = kidsCount*KIDS_PRICE;
   if (kidsCount>0) breakdown += (breakdown?' + ':'')+kidsCount+' trẻ = '+kidsAmt.toLocaleString('vi-VN')+'đ';
   document.getElementById('buy-total-display').textContent = (base+kidsAmt).toLocaleString('vi-VN')+'đ';
   document.getElementById('buy-breakdown').textContent = breakdown;
