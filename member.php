@@ -200,6 +200,10 @@
         <div class="member-avatar" id="m-avatar">NA</div>
         <div class="member-name" id="m-name">Nguyễn Văn A</div>
         <div class="member-phone" id="m-phone">0901 234 567</div>
+        <div class="member-phone" id="m-email-row" style="font-size:12px;opacity:.85;margin-top:2px">
+          <span id="m-email">—</span>
+          <a href="javascript:;" onclick="openEmailModal()" style="color:inherit;text-decoration:underline;margin-left:6px;font-size:11px">Sửa</a>
+        </div>
         <div class="sessions-showcase">
           <div class="sessions-big-num" id="m-sessions">0</div>
           <div class="sessions-big-info">
@@ -341,6 +345,27 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" style="flex:1" onclick="downloadQR()">↓ Tải về</button>
       <button class="btn btn-primary" style="flex:1" onclick="closeQRBig()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Edit Modal -->
+<div id="email-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeEmailModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEmailModal()">✕</button>
+    <div class="modal-title">Cập nhật email</div>
+    <div id="email-modal-alert" class="alert hidden"></div>
+    <div class="form-group">
+      <label class="form-label">Email mới</label>
+      <input type="email" id="em-new-email" class="form-input" placeholder="email@gmail.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mật khẩu để xác thực</label>
+      <input type="password" id="em-password" class="form-input" placeholder="••••••••">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeEmailModal()">Huỷ</button>
+      <button class="btn btn-primary" style="flex:1" id="em-save-btn" onclick="saveEmail()">Lưu</button>
     </div>
   </div>
 </div>
@@ -529,6 +554,7 @@ function renderMember(c, checkins, expired) {
   document.getElementById('m-name').textContent = c.name;
   const ph = c.phone.replace(/\D/g,'');
   document.getElementById('m-phone').textContent = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+  document.getElementById('m-email').textContent = c.email || '(chưa có email)';
 
   updateSessionsDisplay(c, expired);
   renderQRMini(c.phone);
@@ -738,6 +764,40 @@ function showQRBig() {
   document.getElementById('qr-big-modal').classList.remove('hidden');
 }
 function closeQRBig() { document.getElementById('qr-big-modal').classList.add('hidden'); }
+
+function openEmailModal() {
+  if (!currentCustomer) return;
+  document.getElementById('em-new-email').value = currentCustomer.email || '';
+  document.getElementById('em-password').value = '';
+  hideAlert('email-modal-alert');
+  document.getElementById('email-modal').classList.remove('hidden');
+}
+function closeEmailModal() { document.getElementById('email-modal').classList.add('hidden'); }
+async function saveEmail() {
+  if (!currentCustomer) return;
+  const email = document.getElementById('em-new-email').value.trim();
+  const pw    = document.getElementById('em-password').value;
+  if (!email) { showAlert('email-modal-alert','Vui lòng nhập email','warn'); return; }
+  if (!pw)    { showAlert('email-modal-alert','Vui lòng nhập mật khẩu','warn'); return; }
+  const btn = document.getElementById('em-save-btn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  try {
+    const res = await fetch('api/auth.php?action=update_email', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone: currentCustomer.phone, password: pw, email})
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('email-modal-alert', json.error, 'error'); btn.disabled=false; btn.textContent='Lưu'; return; }
+    currentCustomer.email = json.data.email;
+    document.getElementById('m-email').textContent = json.data.email;
+    // Cập nhật localStorage password nếu cần (giữ nguyên)
+    closeEmailModal();
+  } catch(e) {
+    showAlert('email-modal-alert','Lỗi kết nối','error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Lưu';
+  }
+}
 function downloadQR() {
   const canvas = document.querySelector('#qr-big-display canvas');
   if (!canvas) return;

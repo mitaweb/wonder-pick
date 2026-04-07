@@ -177,6 +177,32 @@ switch ($action) {
         jsonResponse(['success' => true, 'token' => md5(ADMIN_PASSWORD)]);
         break;
 
+    // POST: Thành viên cập nhật email
+    // Body: { phone, password, email }
+    case 'update_email':
+        $input    = getJsonInput();
+        $phone    = sanitizePhone($input['phone'] ?? '');
+        $password = $input['password'] ?? '';
+        $email    = strtolower(trim($input['email'] ?? ''));
+        if (!$phone || !$password) jsonResponse(['error' => 'Thiếu thông tin xác thực'], 400);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(['error' => 'Email không hợp lệ'], 400);
+        $db = getDB();
+        $stmt = $db->prepare("SELECT * FROM customers WHERE phone = ?");
+        $stmt->execute([$phone]);
+        $customer = $stmt->fetch();
+        if (!$customer) jsonResponse(['error' => 'Không tìm thấy tài khoản'], 404);
+        if (!$customer['password_hash'] || !password_verify($password, $customer['password_hash'])) {
+            jsonResponse(['error' => 'Mật khẩu không đúng'], 401);
+        }
+        $chk = $db->prepare("SELECT id FROM customers WHERE email = ? AND id <> ?");
+        $chk->execute([$email, $customer['id']]);
+        if ($chk->fetch()) jsonResponse(['error' => 'Email đã được sử dụng'], 409);
+        $db->prepare("UPDATE customers SET email = ? WHERE id = ?")->execute([$email, $customer['id']]);
+        $stmt2 = $db->prepare("SELECT id, phone, name, email, sessions, max_sessions, pkg, expires_at, created_at FROM customers WHERE id = ?");
+        $stmt2->execute([$customer['id']]);
+        jsonResponse(['success' => true, 'data' => $stmt2->fetch()]);
+        break;
+
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);
 }
