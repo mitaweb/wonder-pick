@@ -16,6 +16,14 @@ switch ($action) {
         $phone = sanitizePhone($_GET['phone'] ?? '');
         if (!$phone) jsonResponse(['error' => 'Thiếu số điện thoại'], 400);
         $db = getDB();
+        // Nếu nhập ít hơn 9 số → tìm theo số cuối (LIKE %xxxx)
+        if (strlen($phone) < 9) {
+            if (strlen($phone) < 4) jsonResponse(['error' => 'Nhập tối thiểu 4 số'], 400);
+            $stmt = $db->prepare("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE phone LIKE ? ORDER BY name ASC LIMIT 20");
+            $stmt->execute(['%' . $phone]);
+            $matches = $stmt->fetchAll();
+            jsonResponse(['matches' => $matches, 'partial' => true]);
+        }
         $stmt = $db->prepare("SELECT * FROM customers WHERE phone = ?");
         $stmt->execute([$phone]);
         $customer = $stmt->fetch();

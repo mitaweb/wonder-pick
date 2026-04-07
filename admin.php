@@ -167,7 +167,7 @@
           <div style="display:flex;gap:8px;margin-bottom:12px">
             <div style="flex:1;position:relative">
               <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">📱</span>
-              <input type="tel" id="ci-phone-input" class="form-input" style="padding-left:38px;font-size:15px" placeholder="Nhập SĐT hoặc quét QR..." maxlength="12" onkeydown="if(event.key==='Enter')ciSearch()">
+              <input type="tel" id="ci-phone-input" class="form-input" style="padding-left:38px;font-size:15px" placeholder="Nhập 4 số cuối hoặc SĐT đầy đủ..." maxlength="12" onkeydown="if(event.key==='Enter')ciSearch()">
             </div>
             <button class="btn btn-primary" onclick="ciSearch()">Tìm</button>
             <button class="btn btn-outline" id="ci-scan-btn" onclick="ciStartQR()">📷 QR</button>
@@ -177,6 +177,7 @@
             <button class="btn btn-ghost btn-full" style="margin-top:8px;font-size:13px" onclick="ciStopQR()">✕ Đóng camera</button>
           </div>
           <div id="ci-search-alert" class="alert hidden"></div>
+          <div id="ci-matches-list" style="margin-top:12px"></div>
         </div>
 
         <div id="ci-customer-panel" class="hidden">
@@ -1360,11 +1361,46 @@ let ciCustomer = null, ciPeople = 1, ciQrScanner = null;
 
 function ciSearch() {
   const raw = document.getElementById('ci-phone-input').value.replace(/\D/g,'');
-  if (raw.length < 9) { showAlert('ci-search-alert','Nhập đủ SĐT','warn'); return; }
+  if (raw.length < 4) { showAlert('ci-search-alert','Nhập tối thiểu 4 số cuối','warn'); return; }
   hideAlert('ci-search-alert');
+  document.getElementById('ci-matches-list').innerHTML = '';
   fetch(`${API_BASE}?action=get&phone=${raw}`)
     .then(r=>r.json()).then(json => {
+      if (json.partial) {
+        const list = json.matches || [];
+        if (list.length === 0) { showAlert('ci-search-alert','Không tìm thấy khách hàng','error'); document.getElementById('ci-customer-panel').classList.add('hidden'); return; }
+        if (list.length === 1) { ciSelectMatch(list[0].phone); return; }
+        renderCiMatches(list);
+        document.getElementById('ci-customer-panel').classList.add('hidden');
+        return;
+      }
       if (!json.data) { showAlert('ci-search-alert','Không tìm thấy khách hàng','error'); document.getElementById('ci-customer-panel').classList.add('hidden'); return; }
+      ciCustomer = json.data; ciPeople = 1;
+      ciRender(json.data, json.checkins||[]);
+    }).catch(()=>showAlert('ci-search-alert','Lỗi kết nối','error'));
+}
+
+function renderCiMatches(list) {
+  const wrap = document.getElementById('ci-matches-list');
+  wrap.innerHTML = '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">Tìm thấy ' + list.length + ' khách hàng:</div>' +
+    list.map(c => {
+      const ph = (c.phone||'').replace(/\D/g,'');
+      const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+      const initials = (c.name||'').trim().split(' ').map(w=>w[0]).filter(Boolean).slice(-2).join('').toUpperCase();
+      return `<div onclick="ciSelectMatch('${ph}')" style="display:flex;align-items:center;gap:12px;padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius-lg);margin-bottom:8px;cursor:pointer;background:var(--bg)">
+        <div class="customer-avatar" style="width:40px;height:40px;font-size:14px">${initials||'NA'}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${c.name||'—'}</div><div style="font-size:12px;color:var(--text2)">${phFmt} · Còn ${c.sessions||0} buổi</div></div>
+        <div style="font-size:18px;color:var(--text3)">›</div>
+      </div>`;
+    }).join('');
+}
+
+function ciSelectMatch(phone) {
+  document.getElementById('ci-matches-list').innerHTML = '';
+  document.getElementById('ci-phone-input').value = phone;
+  fetch(`${API_BASE}?action=get&phone=${phone}`)
+    .then(r=>r.json()).then(json => {
+      if (!json.data) { showAlert('ci-search-alert','Không tìm thấy khách hàng','error'); return; }
       ciCustomer = json.data; ciPeople = 1;
       ciRender(json.data, json.checkins||[]);
     }).catch(()=>showAlert('ci-search-alert','Lỗi kết nối','error'));
