@@ -247,18 +247,35 @@ switch ($action) {
         $ciStats->execute([$dateFrom, $dateTo]);
         $checkinStats = $ciStats->fetch();
 
+        // Check-in tách: combo (mua gói) vs vãng lai (single/kids)
+        $ciCombo = $db->prepare("SELECT COUNT(*) as checkins, COALESCE(SUM(c.people_count),COUNT(*)) as people FROM checkins c JOIN customers cu ON c.phone = cu.phone WHERE cu.pkg NOT IN ('none','single','kids') AND DATE(c.checked_in_at) BETWEEN ? AND ?");
+        $ciCombo->execute([$dateFrom, $dateTo]);
+        $ciComboStats = $ciCombo->fetch();
+        $ciWalk = [
+            'checkins' => (int)$checkinStats['total_checkins'] - (int)$ciComboStats['checkins'],
+            'people' => (int)$checkinStats['total_people'] - (int)$ciComboStats['people'],
+        ];
+
         // Danh sách check-in trong khoảng ngày
-        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
+        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name, cu.pkg FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
         $ciList->execute([$dateFrom, $dateTo]);
         $dateCheckins = $ciList->fetchAll();
 
-        // 2. Hội viên còn dưới 5 buổi tập
-        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 ORDER BY sessions ASC")->fetchAll();
+        // 2. Hội viên còn dưới 5 buổi tập (chỉ khách mua gói combo, không tính vãng lai)
+        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at, pkg FROM customers WHERE sessions > 0 AND sessions <= 5 AND pkg NOT IN ('none','single','kids') ORDER BY sessions ASC")->fetchAll();
 
         // 3. Doanh thu trong khoảng ngày
         $revRange = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ?");
         $revRange->execute([$dateFrom, $dateTo]);
         $revenueStats = $revRange->fetch();
+
+        // Doanh thu tách: combo vs vãng lai
+        $revCombo = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') AND DATE(paid_at) BETWEEN ? AND ?");
+        $revCombo->execute([$dateFrom, $dateTo]);
+        $revComboStats = $revCombo->fetch();
+        $revWalk = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND pkg_type IN ('single','kids') AND DATE(paid_at) BETWEEN ? AND ?");
+        $revWalk->execute([$dateFrom, $dateTo]);
+        $revWalkStats = $revWalk->fetch();
 
         // Doanh thu theo ngày trong khoảng
         $revDays = $db->prepare("SELECT DATE(paid_at) as day, SUM(amount) as revenue, COUNT(*) as orders FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY day DESC");
@@ -279,11 +296,27 @@ switch ($action) {
                 'total_checkins' => (int)$checkinStats['total_checkins'],
                 'total_people' => (int)$checkinStats['total_people'],
             ],
+            'checkin_combo' => [
+                'checkins' => (int)$ciComboStats['checkins'],
+                'people' => (int)$ciComboStats['people'],
+            ],
+            'checkin_walkin' => [
+                'checkins' => $ciWalk['checkins'],
+                'people' => $ciWalk['people'],
+            ],
             'date_checkins' => $dateCheckins,
             'low_session_members' => $lowMembers,
             'revenue' => [
                 'total' => (float)$revenueStats['revenue'],
                 'paid_count' => (int)$revenueStats['paid_count'],
+            ],
+            'revenue_combo' => [
+                'total' => (float)$revComboStats['revenue'],
+                'paid_count' => (int)$revComboStats['paid_count'],
+            ],
+            'revenue_walkin' => [
+                'total' => (float)$revWalkStats['revenue'],
+                'paid_count' => (int)$revWalkStats['paid_count'],
             ],
             'revenue_days' => $revenueDays,
             'revenue_month' => [
@@ -293,6 +326,81 @@ switch ($action) {
             ],
         ]);
         break;
+
+    // GET (admin): Xuất báo cáo Excel CSV
+    case 'export_report':
+        if (($_GET['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) { http_response_code(401); echo 'Unauthorized'; exit; }
+        $db = getDB();
+        $today = date('Y-m-d');
+        $dateFrom = $_GET['date_from'] ?? $today;
+        $dateTo   = $_GET['date_to'] ?? $today;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = $today;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = $today;
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="wonder_report_' . $dateFrom . '_' . $dateTo . '.csv"');
+        $bom = "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fwrite($out, $bom);
+
+        // Sheet 1: Doanh thu
+        fputcsv($out, ['=== DOANH THU (' . $dateFrom . ' → ' . $dateTo . ') ===']);
+        fputcsv($out, ['Loại', 'Doanh thu', 'Số đơn']);
+        $revAll = $db->prepare("SELECT COALESCE(SUM(amount),0) as rev, COUNT(*) as cnt FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ?");
+        $revAll->execute([$dateFrom, $dateTo]);
+        $ra = $revAll->fetch();
+        $revCombo = $db->prepare("SELECT COALESCE(SUM(amount),0) as rev, COUNT(*) as cnt FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') AND DATE(paid_at) BETWEEN ? AND ?");
+        $revCombo->execute([$dateFrom, $dateTo]);
+        $rc = $revCombo->fetch();
+        $revWalk = $db->prepare("SELECT COALESCE(SUM(amount),0) as rev, COUNT(*) as cnt FROM orders WHERE payment_status='Paid' AND pkg_type IN ('single','kids') AND DATE(paid_at) BETWEEN ? AND ?");
+        $revWalk->execute([$dateFrom, $dateTo]);
+        $rw = $revWalk->fetch();
+        fputcsv($out, ['Tổng cộng', $ra['rev'], $ra['cnt']]);
+        fputcsv($out, ['Khách mua gói (combo)', $rc['rev'], $rc['cnt']]);
+        fputcsv($out, ['Khách vãng lai (lẻ)', $rw['rev'], $rw['cnt']]);
+        fputcsv($out, []);
+
+        // Sheet 2: Doanh thu theo ngày
+        fputcsv($out, ['=== DOANH THU THEO NGÀY ===']);
+        fputcsv($out, ['Ngày', 'Doanh thu', 'Số đơn']);
+        $revDays = $db->prepare("SELECT DATE(paid_at) as day, SUM(amount) as rev, COUNT(*) as cnt FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY day DESC");
+        $revDays->execute([$dateFrom, $dateTo]);
+        foreach ($revDays as $d) { fputcsv($out, [$d['day'], $d['rev'], $d['cnt']]); }
+        fputcsv($out, []);
+
+        // Sheet 3: Lượt chơi
+        fputcsv($out, ['=== LƯỢT CHƠI ===']);
+        fputcsv($out, ['Loại', 'Lượt check-in', 'Số người']);
+        $ciAll = $db->prepare("SELECT COUNT(*) as ci, COALESCE(SUM(people_count),COUNT(*)) as ppl FROM checkins WHERE DATE(checked_in_at) BETWEEN ? AND ?");
+        $ciAll->execute([$dateFrom, $dateTo]);
+        $ca = $ciAll->fetch();
+        $ciCombo = $db->prepare("SELECT COUNT(*) as ci, COALESCE(SUM(c.people_count),COUNT(*)) as ppl FROM checkins c JOIN customers cu ON c.phone = cu.phone WHERE cu.pkg NOT IN ('none','single','kids') AND DATE(c.checked_in_at) BETWEEN ? AND ?");
+        $ciCombo->execute([$dateFrom, $dateTo]);
+        $cc = $ciCombo->fetch();
+        fputcsv($out, ['Tổng cộng', $ca['ci'], $ca['ppl']]);
+        fputcsv($out, ['Khách mua gói (combo)', $cc['ci'], $cc['ppl']]);
+        fputcsv($out, ['Khách vãng lai (lẻ)', (int)$ca['ci'] - (int)$cc['ci'], (int)$ca['ppl'] - (int)$cc['ppl']]);
+        fputcsv($out, []);
+
+        // Sheet 4: Chi tiết check-in
+        fputcsv($out, ['=== CHI TIẾT CHECK-IN ===']);
+        fputcsv($out, ['Thời gian', 'Họ tên', 'SĐT', 'Loại khách', 'Số người', 'Trước', 'Sau', 'Ghi chú']);
+        $ciList = $db->prepare("SELECT c.*, cu.name, cu.pkg FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
+        $ciList->execute([$dateFrom, $dateTo]);
+        foreach ($ciList as $ci) {
+            $type = (in_array($ci['pkg'] ?? '', ['none','single','kids',''])) ? 'Vãng lai' : 'Mua gói';
+            fputcsv($out, [$ci['checked_in_at'], $ci['name'] ?? '', $ci['phone'], $type, $ci['people_count'] ?? 1, $ci['sessions_before'], $ci['sessions_after'], $ci['note'] ?? '']);
+        }
+        fputcsv($out, []);
+
+        // Sheet 5: Hội viên dưới 5 buổi (chỉ combo)
+        fputcsv($out, ['=== HỘI VIÊN CÒN DƯỚI 5 BUỔI (MUA GÓI) ===']);
+        fputcsv($out, ['Họ tên', 'SĐT', 'Buổi còn lại', 'Tổng buổi', 'Hết hạn']);
+        $lowM = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND pkg NOT IN ('none','single','kids') ORDER BY sessions ASC");
+        foreach ($lowM as $m) { fputcsv($out, [$m['name'], $m['phone'], $m['sessions'], $m['max_sessions'], $m['expires_at'] ?? '']); }
+
+        fclose($out);
+        exit;
 
     default:
         jsonResponse(['error' => 'Action không hợp lệ'], 400);
