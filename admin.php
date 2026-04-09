@@ -263,7 +263,7 @@
 
           <!-- Doanh thu -->
           <div class="report-section">
-            <h3>💰 Doanh thu <span id="rpt-rev-label" style="font-size:12px;font-weight:400;color:var(--text2)"></span></h3>
+            <h3 style="justify-content:space-between">💰 Doanh thu <span id="rpt-rev-label" style="font-size:12px;font-weight:400;color:var(--text2)"></span> <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="exportReport()">📥 Xuất Excel</button></h3>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
               <div>
                 <div class="revenue-big" id="rpt-revenue">0đ</div>
@@ -273,6 +273,18 @@
                 <div style="font-size:13px;color:var(--text2);margin-bottom:4px">Doanh thu tháng này</div>
                 <div style="font-size:22px;font-weight:700;color:var(--green-dark)" id="rpt-rev-month">0đ</div>
                 <div style="font-size:12px;color:var(--text3)" id="rpt-rev-month-sub"></div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--green-light);border-radius:var(--radius);padding:12px">
+                <div style="font-size:11px;color:var(--green-dark);margin-bottom:4px">Khách mua gói (combo)</div>
+                <div style="font-size:18px;font-weight:700;color:var(--green-dark)" id="rpt-rev-combo">0đ</div>
+                <div style="font-size:11px;color:var(--text2)" id="rpt-rev-combo-sub">0 đơn</div>
+              </div>
+              <div style="background:var(--bg2);border-radius:var(--radius);padding:12px">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Khách vãng lai (lẻ)</div>
+                <div style="font-size:18px;font-weight:700;color:var(--text)" id="rpt-rev-walkin">0đ</div>
+                <div style="font-size:11px;color:var(--text2)" id="rpt-rev-walkin-sub">0 đơn</div>
               </div>
             </div>
           </div>
@@ -287,7 +299,7 @@
           <!-- Lượt chơi -->
           <div class="report-section">
             <h3>🏃 Lượt chơi <span id="rpt-ci-label" style="font-size:12px;font-weight:400;color:var(--text2)"></span></h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
               <div style="background:var(--green-light);border-radius:var(--radius);padding:16px;text-align:center">
                 <div style="font-size:28px;font-weight:700;color:var(--green-dark)" id="rpt-people">0</div>
                 <div style="font-size:12px;color:var(--green-dark)">Người vào chơi</div>
@@ -295,6 +307,16 @@
               <div style="background:var(--bg2);border-radius:var(--radius);padding:16px;text-align:center">
                 <div style="font-size:28px;font-weight:700;color:var(--text)" id="rpt-checkins">0</div>
                 <div style="font-size:12px;color:var(--text2)">Lượt check-in</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+              <div style="background:var(--green-light);border-radius:var(--radius);padding:10px">
+                <div style="font-size:11px;color:var(--green-dark);margin-bottom:2px">Mua gói (combo)</div>
+                <div style="font-size:15px;font-weight:700;color:var(--green-dark)"><span id="rpt-ci-combo-ppl">0</span> người · <span id="rpt-ci-combo-ci">0</span> lượt</div>
+              </div>
+              <div style="background:var(--bg2);border-radius:var(--radius);padding:10px">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:2px">Vãng lai (lẻ)</div>
+                <div style="font-size:15px;font-weight:700;color:var(--text)"><span id="rpt-ci-walk-ppl">0</span> người · <span id="rpt-ci-walk-ci">0</span> lượt</div>
               </div>
             </div>
             <div id="rpt-checkin-list" class="report-list"></div>
@@ -310,8 +332,8 @@
 
           <!-- Hội viên cần chăm sóc -->
           <div class="report-section">
-            <h3>⚠ Hội viên còn dưới 5 buổi <span style="font-size:12px;font-weight:400;color:var(--text3)" id="rpt-low-count">(0)</span></h3>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Liên hệ chăm sóc và gợi ý mua gói mới</div>
+            <h3>⚠ Hội viên mua gói còn dưới 5 buổi <span style="font-size:12px;font-weight:400;color:var(--text3)" id="rpt-low-count">(0)</span></h3>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Chỉ tính khách đã mua gói combo — liên hệ chăm sóc và gợi ý gia hạn</div>
             <div id="rpt-low-list" class="report-list"></div>
             <div id="rpt-low-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Không có hội viên nào</div>
             <div id="rpt-low-pager" class="pager hidden">
@@ -1278,6 +1300,16 @@ async function loadReport() {
       document.getElementById('rpt-rev-month-sub').textContent = json.revenue_month.paid_count + ' đơn — T' + json.revenue_month.month_label;
     }
 
+    // Doanh thu tách combo / vãng lai
+    if (json.revenue_combo) {
+      document.getElementById('rpt-rev-combo').textContent = formatMoney(json.revenue_combo.total) + 'đ';
+      document.getElementById('rpt-rev-combo-sub').textContent = json.revenue_combo.paid_count + ' đơn';
+    }
+    if (json.revenue_walkin) {
+      document.getElementById('rpt-rev-walkin').textContent = formatMoney(json.revenue_walkin.total) + 'đ';
+      document.getElementById('rpt-rev-walkin-sub').textContent = json.revenue_walkin.paid_count + ' đơn';
+    }
+
     // Doanh thu theo ngày
     const revDaysEl = document.getElementById('rpt-rev-days');
     const revDaysEmpty = document.getElementById('rpt-rev-days-empty');
@@ -1296,6 +1328,16 @@ async function loadReport() {
     document.getElementById('rpt-ci-label').textContent = dateLabel;
     document.getElementById('rpt-people').textContent = json.checkin_stats.total_people;
     document.getElementById('rpt-checkins').textContent = json.checkin_stats.total_checkins;
+
+    // Lượt chơi tách combo / vãng lai
+    if (json.checkin_combo) {
+      document.getElementById('rpt-ci-combo-ppl').textContent = json.checkin_combo.people;
+      document.getElementById('rpt-ci-combo-ci').textContent = json.checkin_combo.checkins;
+    }
+    if (json.checkin_walkin) {
+      document.getElementById('rpt-ci-walk-ppl').textContent = json.checkin_walkin.people;
+      document.getElementById('rpt-ci-walk-ci').textContent = json.checkin_walkin.checkins;
+    }
     ciData = json.date_checkins || [];
     ciPage = 1;
     renderCiPage();
@@ -1383,6 +1425,12 @@ function renderLowPage() {
   }
 }
 function lowPageChange(d) { lowPage += d; renderLowPage(); }
+
+function exportReport() {
+  const dateFrom = document.getElementById('rpt-date-from').value;
+  const dateTo = document.getElementById('rpt-date-to').value;
+  window.open(`${API_BASE}?action=export_report&admin_token=${adminToken}&date_from=${dateFrom}&date_to=${dateTo}`, '_blank');
+}
 
 // ---- CHECK-IN ----
 let ciCustomer = null, ciPeople = 1, ciQrScanner = null;
