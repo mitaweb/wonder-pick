@@ -542,6 +542,10 @@
       <label style="font-size:12px;color:var(--text2)">Ngày hết hạn</label>
       <input type="date" id="edit-expiry" class="form-input">
     </div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text2)">Đặt mật khẩu mới <span style="opacity:.5">(để trống = không đổi)</span></label>
+      <input type="text" id="edit-password" class="form-input" placeholder="Nhập mật khẩu mới...">
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeEditModal()">Hủy</button>
       <button class="btn btn-primary" onclick="saveEditMember()">Lưu thay đổi</button>
@@ -954,6 +958,7 @@ function openEditModal(phone) {
   document.getElementById('edit-sessions').value = c.sessions;
   document.getElementById('edit-max-sessions').value = c.max_sessions;
   document.getElementById('edit-expiry').value = c.expires_at || '';
+  document.getElementById('edit-password').value = '';
   hideAlert('edit-modal-alert');
   document.getElementById('edit-modal').classList.remove('hidden');
 }
@@ -971,6 +976,11 @@ async function saveEditMember() {
     expires_at: document.getElementById('edit-expiry').value || null,
     admin_token: adminToken
   };
+  const newPw = document.getElementById('edit-password').value;
+  if (newPw) {
+    if (newPw.length < 6) { showAlert('edit-modal-alert','Mật khẩu tối thiểu 6 ký tự','warn'); return; }
+    data.new_password = newPw;
+  }
   if (!data.name) { showAlert('edit-modal-alert','Tên không được để trống','warn'); return; }
   try {
     const res = await fetch(`${API_BASE}?action=update_customer`, {
