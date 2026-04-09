@@ -168,6 +168,14 @@ switch ($action) {
         $db->prepare("UPDATE customers SET name = ?, email = ?, sessions = ?, max_sessions = ?, expires_at = ? WHERE phone = ?")
            ->execute([$name, $email ?: null, $sessions, $maxSess, $expiry ?: null, $phone]);
 
+        // Cập nhật mật khẩu nếu admin gửi new_password
+        $newPw = $input['new_password'] ?? '';
+        if ($newPw) {
+            if (strlen($newPw) < 6) jsonResponse(['error' => 'Mật khẩu tối thiểu 6 ký tự'], 400);
+            $hash = password_hash($newPw, PASSWORD_BCRYPT);
+            $db->prepare("UPDATE customers SET password_hash = ? WHERE phone = ?")->execute([$hash, $phone]);
+        }
+
         $updated = $db->prepare("SELECT * FROM customers WHERE phone = ?");
         $updated->execute([$phone]);
         jsonResponse(['success' => true, 'data' => $updated->fetch()]);
