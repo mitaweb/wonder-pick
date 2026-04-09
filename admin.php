@@ -644,6 +644,7 @@ async function adminLogin() {
     const json = await res.json();
     if (json.error) { showAlert('login-alert', json.error, 'error'); return; }
     adminToken = json.token;
+    localStorage.setItem('wp_admin_pw', pw);
     loadDashboard();
   } catch(e) {
     showAlert('login-alert','Lỗi kết nối server','error');
@@ -652,11 +653,28 @@ async function adminLogin() {
 
 function adminLogout() {
   adminToken = null;
+  localStorage.removeItem('wp_admin_pw');
   clearInterval(autoRefreshTimer);
   document.getElementById('login-panel').classList.remove('hidden');
   document.getElementById('admin-panel').classList.add('hidden');
   document.getElementById('admin-pw').value = '';
 }
+
+// Auto-login admin từ localStorage
+(async function autoAdminLogin() {
+  const savedPw = localStorage.getItem('wp_admin_pw');
+  if (!savedPw) return;
+  try {
+    const res = await fetch('api/auth.php?action=admin_login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: savedPw})
+    });
+    const json = await res.json();
+    if (json.error) { localStorage.removeItem('wp_admin_pw'); return; }
+    adminToken = json.token;
+    loadDashboard();
+  } catch(e) { /* silent fail */ }
+})();
 
 async function loadDashboard() {
   try {
