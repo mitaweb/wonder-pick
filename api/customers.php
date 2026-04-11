@@ -247,8 +247,9 @@ switch ($action) {
         $ciStats->execute([$dateFrom, $dateTo]);
         $checkinStats = $ciStats->fetch();
 
-        // Check-in tách: combo (mua gói) vs vãng lai (single/kids)
-        $ciCombo = $db->prepare("SELECT COUNT(*) as checkins, COALESCE(SUM(c.people_count),COUNT(*)) as people FROM checkins c JOIN customers cu ON c.phone = cu.phone WHERE cu.pkg NOT IN ('none','single','kids') AND DATE(c.checked_in_at) BETWEEN ? AND ?");
+        // Check-in tách: combo (sở hữu gói combo) vs vãng lai (chỉ mua lẻ)
+        // Combo = khách có ít nhất 1 đơn combo đã thanh toán HOẶC được admin cộng gói combo
+        $ciCombo = $db->prepare("SELECT COUNT(*) as checkins, COALESCE(SUM(c.people_count),COUNT(*)) as people FROM checkins c WHERE DATE(c.checked_in_at) BETWEEN ? AND ? AND (c.phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR c.phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')))");
         $ciCombo->execute([$dateFrom, $dateTo]);
         $ciComboStats = $ciCombo->fetch();
         $ciWalk = [
@@ -256,20 +257,29 @@ switch ($action) {
             'people' => (int)$checkinStats['total_people'] - (int)$ciComboStats['people'],
         ];
 
-        // Danh sách check-in trong khoảng ngày
-        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name, cu.pkg FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
-        $ciList->execute([$dateFrom, $dateTo]);
-        $dateCheckins = $ciList->fetchAll();
+        // Lấy danh sách phone sở hữu combo (mua gói qua orders hoặc admin cộng)
+        $comboPhones = [];
+        $cpStmt = $db->query("SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') UNION SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')");
+        foreach ($cpStmt as $r) { $comboPhones[$r['phone']] = true; }
 
-        // 2. Hội viên còn dưới 5 buổi tập (chỉ khách mua gói combo, không tính vãng lai)
-        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at, pkg FROM customers WHERE sessions > 0 AND sessions <= 5 AND pkg NOT IN ('none','single','kids') ORDER BY sessions ASC")->fetchAll();
+        // Danh sách check-in trong khoảng ngày
+        $ciList = $db->prepare("SELECT c.phone, c.sessions_before, c.sessions_after, c.checked_in_at, c.note, c.people_count, cu.name FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
+        $ciList->execute([$dateFrom, $dateTo]);
+        $dateCheckins = [];
+        foreach ($ciList as $ci) {
+            $ci['is_combo'] = isset($comboPhones[$ci['phone']]) ? 1 : 0;
+            $dateCheckins[] = $ci;
+        }
+
+        // 2. Hội viên còn dưới 5 buổi tập (chỉ khách sở hữu gói combo)
+        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND (phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual'))) ORDER BY sessions ASC")->fetchAll();
 
         // 3. Doanh thu trong khoảng ngày
         $revRange = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ?");
         $revRange->execute([$dateFrom, $dateTo]);
         $revenueStats = $revRange->fetch();
 
-        // Doanh thu tách: combo vs vãng lai
+        // Doanh thu tách: combo (đơn mua gói combo) vs vãng lai (đơn mua lẻ/kids)
         $revCombo = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') AND DATE(paid_at) BETWEEN ? AND ?");
         $revCombo->execute([$dateFrom, $dateTo]);
         $revComboStats = $revCombo->fetch();
@@ -374,29 +384,33 @@ switch ($action) {
         $ciAll = $db->prepare("SELECT COUNT(*) as ci, COALESCE(SUM(people_count),COUNT(*)) as ppl FROM checkins WHERE DATE(checked_in_at) BETWEEN ? AND ?");
         $ciAll->execute([$dateFrom, $dateTo]);
         $ca = $ciAll->fetch();
-        $ciCombo = $db->prepare("SELECT COUNT(*) as ci, COALESCE(SUM(c.people_count),COUNT(*)) as ppl FROM checkins c JOIN customers cu ON c.phone = cu.phone WHERE cu.pkg NOT IN ('none','single','kids') AND DATE(c.checked_in_at) BETWEEN ? AND ?");
+        $ciCombo = $db->prepare("SELECT COUNT(*) as ci, COALESCE(SUM(c.people_count),COUNT(*)) as ppl FROM checkins c WHERE DATE(c.checked_in_at) BETWEEN ? AND ? AND (c.phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR c.phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')))");
         $ciCombo->execute([$dateFrom, $dateTo]);
         $cc = $ciCombo->fetch();
         fputcsv($out, ['Tổng cộng', $ca['ci'], $ca['ppl']]);
-        fputcsv($out, ['Khách mua gói (combo)', $cc['ci'], $cc['ppl']]);
+        fputcsv($out, ['Khách sở hữu gói (combo)', $cc['ci'], $cc['ppl']]);
         fputcsv($out, ['Khách vãng lai (lẻ)', (int)$ca['ci'] - (int)$cc['ci'], (int)$ca['ppl'] - (int)$cc['ppl']]);
         fputcsv($out, []);
 
         // Sheet 4: Chi tiết check-in
         fputcsv($out, ['=== CHI TIẾT CHECK-IN ===']);
         fputcsv($out, ['Thời gian', 'Họ tên', 'SĐT', 'Loại khách', 'Số người', 'Trước', 'Sau', 'Ghi chú']);
-        $ciList = $db->prepare("SELECT c.*, cu.name, cu.pkg FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
+        // Lấy danh sách phone sở hữu combo
+        $comboPhones = [];
+        $cpStmt = $db->query("SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') UNION SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')");
+        foreach ($cpStmt as $r) { $comboPhones[$r['phone']] = true; }
+        $ciList = $db->prepare("SELECT c.*, cu.name FROM checkins c LEFT JOIN customers cu ON c.phone = cu.phone WHERE DATE(c.checked_in_at) BETWEEN ? AND ? ORDER BY c.checked_in_at DESC");
         $ciList->execute([$dateFrom, $dateTo]);
         foreach ($ciList as $ci) {
-            $type = (in_array($ci['pkg'] ?? '', ['none','single','kids',''])) ? 'Vãng lai' : 'Mua gói';
+            $type = isset($comboPhones[$ci['phone']]) ? 'Sở hữu gói' : 'Vãng lai';
             fputcsv($out, [$ci['checked_in_at'], $ci['name'] ?? '', $ci['phone'], $type, $ci['people_count'] ?? 1, $ci['sessions_before'], $ci['sessions_after'], $ci['note'] ?? '']);
         }
         fputcsv($out, []);
 
         // Sheet 5: Hội viên dưới 5 buổi (chỉ combo)
-        fputcsv($out, ['=== HỘI VIÊN CÒN DƯỚI 5 BUỔI (MUA GÓI) ===']);
+        fputcsv($out, ['=== HỘI VIÊN SỞ HỮU GÓI CÒN DƯỚI 5 BUỔI ===']);
         fputcsv($out, ['Họ tên', 'SĐT', 'Buổi còn lại', 'Tổng buổi', 'Hết hạn']);
-        $lowM = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND pkg NOT IN ('none','single','kids') ORDER BY sessions ASC");
+        $lowM = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND (phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual'))) ORDER BY sessions ASC");
         foreach ($lowM as $m) { fputcsv($out, [$m['name'], $m['phone'], $m['sessions'], $m['max_sessions'], $m['expires_at'] ?? '']); }
 
         fclose($out);

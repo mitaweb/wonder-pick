@@ -277,7 +277,7 @@
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div style="background:var(--green-light);border-radius:var(--radius);padding:12px">
-                <div style="font-size:11px;color:var(--green-dark);margin-bottom:4px">Khách mua gói (combo)</div>
+                <div style="font-size:11px;color:var(--green-dark);margin-bottom:4px">Bán gói combo</div>
                 <div style="font-size:18px;font-weight:700;color:var(--green-dark)" id="rpt-rev-combo">0đ</div>
                 <div style="font-size:11px;color:var(--text2)" id="rpt-rev-combo-sub">0 đơn</div>
               </div>
@@ -311,7 +311,7 @@
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
               <div style="background:var(--green-light);border-radius:var(--radius);padding:10px">
-                <div style="font-size:11px;color:var(--green-dark);margin-bottom:2px">Mua gói (combo)</div>
+                <div style="font-size:11px;color:var(--green-dark);margin-bottom:2px">Sở hữu gói (combo)</div>
                 <div style="font-size:15px;font-weight:700;color:var(--green-dark)"><span id="rpt-ci-combo-ppl">0</span> người · <span id="rpt-ci-combo-ci">0</span> lượt</div>
               </div>
               <div style="background:var(--bg2);border-radius:var(--radius);padding:10px">
@@ -332,8 +332,8 @@
 
           <!-- Hội viên cần chăm sóc -->
           <div class="report-section">
-            <h3>⚠ Hội viên mua gói còn dưới 5 buổi <span style="font-size:12px;font-weight:400;color:var(--text3)" id="rpt-low-count">(0)</span></h3>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Chỉ tính khách đã mua gói combo — liên hệ chăm sóc và gợi ý gia hạn</div>
+            <h3>⚠ Hội viên sở hữu gói còn dưới 5 buổi <span style="font-size:12px;font-weight:400;color:var(--text3)" id="rpt-low-count">(0)</span></h3>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Chỉ tính khách đã sở hữu gói combo — liên hệ chăm sóc và gợi ý gia hạn</div>
             <div id="rpt-low-list" class="report-list"></div>
             <div id="rpt-low-empty" class="hidden" style="font-size:13px;color:var(--text3);text-align:center;padding:16px">Không có hội viên nào</div>
             <div id="rpt-low-pager" class="pager hidden">
