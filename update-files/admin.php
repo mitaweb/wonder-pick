@@ -224,6 +224,7 @@
             <h3>Danh sách thành viên</h3>
             <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
               <input type="text" class="form-input" style="width:180px;font-size:13px" placeholder="Tìm tên hoặc SĐT..." oninput="filterList(this.value)">
+              <button class="btn btn-primary" style="font-size:12px;white-space:nowrap;padding:7px 12px" onclick="openBulkModal()">+ Tạo tài khoản</button>
               <button class="btn btn-outline" style="font-size:12px;white-space:nowrap;padding:7px 12px" onclick="exportMembers()">📥 Xuất Excel</button>
             </div>
           </div>
@@ -571,6 +572,40 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeEditModal()">Hủy</button>
       <button class="btn btn-primary" onclick="saveEditMember()">Lưu thay đổi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Create Modal -->
+<div id="bulk-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeBulkModal()">
+  <div class="modal" style="max-width:820px">
+    <button class="modal-close" onclick="closeBulkModal()">✕</button>
+    <div class="modal-title">Tạo tài khoản khách hàng hàng loạt</div>
+    <div id="bulk-modal-alert" class="alert hidden"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+      Mật khẩu mặc định: <strong>123456</strong> · SĐT thiếu số 0 đầu sẽ tự động thêm
+    </div>
+    <div style="overflow-x:auto;max-height:50vh">
+      <table class="data-table" style="font-size:13px" id="bulk-table">
+        <thead><tr>
+          <th style="width:32px">#</th>
+          <th>Họ tên *</th>
+          <th style="width:140px">SĐT *</th>
+          <th>Email</th>
+          <th style="width:90px">Buổi</th>
+          <th style="width:40px"></th>
+        </tr></thead>
+        <tbody id="bulk-tbody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="bulkAddRow()">+ Thêm dòng</button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="bulkAddRow(10)">+ 10 dòng</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);align-self:center"><span id="bulk-row-count">0</span> dòng</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeBulkModal()">Hủy</button>
+      <button class="btn btn-primary" id="bulk-save-btn" onclick="bulkSave()">Tạo tài khoản</button>
     </div>
   </div>
 </div>
@@ -1014,6 +1049,69 @@ async function saveEditMember() {
     closeEditModal();
     loadDashboard();
   } catch(e) { showAlert('edit-modal-alert','Lỗi kết nối','error'); }
+}
+
+// ---- BULK CREATE ----
+function openBulkModal() {
+  document.getElementById('bulk-tbody').innerHTML = '';
+  hideAlert('bulk-modal-alert');
+  bulkAddRow(5);
+  document.getElementById('bulk-modal').classList.remove('hidden');
+}
+function closeBulkModal() { document.getElementById('bulk-modal').classList.add('hidden'); }
+function bulkAddRow(count=1) {
+  const tbody = document.getElementById('bulk-tbody');
+  for (let i=0; i<count; i++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text3);font-size:12px" class="bulk-idx"></td>
+      <td><input type="text" class="form-input bulk-name" style="font-size:13px;padding:6px 8px" placeholder="Họ tên"></td>
+      <td><input type="tel" class="form-input bulk-phone" style="font-size:13px;padding:6px 8px" placeholder="0901234567"></td>
+      <td><input type="email" class="form-input bulk-email" style="font-size:13px;padding:6px 8px" placeholder="email@..."></td>
+      <td><input type="number" class="form-input bulk-sessions" style="font-size:13px;padding:6px 8px" min="0" value="0"></td>
+      <td><button class="btn btn-ghost" style="font-size:14px;padding:4px 8px;color:var(--red)" onclick="this.closest('tr').remove();bulkRenum()">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  bulkRenum();
+}
+function bulkRenum() {
+  const rows = document.querySelectorAll('#bulk-tbody tr');
+  rows.forEach((r,i) => { r.querySelector('.bulk-idx').textContent = i+1; });
+  document.getElementById('bulk-row-count').textContent = rows.length;
+}
+async function bulkSave() {
+  const rows = document.querySelectorAll('#bulk-tbody tr');
+  const customers = [];
+  rows.forEach(r => {
+    const name = r.querySelector('.bulk-name').value.trim();
+    const phone = r.querySelector('.bulk-phone').value.trim();
+    const email = r.querySelector('.bulk-email').value.trim();
+    const sessions = parseInt(r.querySelector('.bulk-sessions').value) || 0;
+    if (name || phone) customers.push({name, phone, email, sessions});
+  });
+  if (customers.length === 0) { showAlert('bulk-modal-alert','Chưa nhập dữ liệu','warn'); return; }
+  const btn = document.getElementById('bulk-save-btn');
+  btn.disabled = true; btn.textContent = 'Đang tạo...';
+  try {
+    const res = await fetch(`${API_BASE}?action=bulk_create`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({admin_token: adminToken, default_password: '123456', customers})
+    });
+    const json = await res.json();
+    if (json.error) { showAlert('bulk-modal-alert', json.error, 'error'); return; }
+    let msg = `Đã tạo ${json.created} tài khoản`;
+    if (json.skipped > 0) msg += ` · Bỏ qua ${json.skipped} dòng`;
+    if (json.errors && json.errors.length > 0) msg += '\n• ' + json.errors.slice(0,5).join('\n• ');
+    showAlert('bulk-modal-alert', msg, json.created > 0 ? 'success' : 'warn');
+    if (json.created > 0) {
+      setTimeout(() => { closeBulkModal(); loadDashboard(); }, 1500);
+    }
+  } catch(e) {
+    showAlert('bulk-modal-alert','Lỗi kết nối','error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Tạo tài khoản';
+  }
 }
 
 // ---- EXPORT ----
