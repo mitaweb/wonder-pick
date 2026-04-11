@@ -181,6 +181,48 @@ switch ($action) {
         jsonResponse(['success' => true, 'data' => $updated->fetch()]);
         break;
 
+    // POST (admin): Tạo hàng loạt tài khoản khách hàng
+    // Body: { admin_token, default_password, customers:[{name,phone,email,sessions}] }
+    case 'bulk_create':
+        $input = getJsonInput();
+        if (($input['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) jsonResponse(['error' => 'Unauthorized'], 401);
+        $list = $input['customers'] ?? [];
+        if (!is_array($list) || count($list) === 0) jsonResponse(['error' => 'Danh sách khách hàng trống'], 400);
+        $defaultPw = $input['default_password'] ?? '123456';
+        $defaultHash = password_hash($defaultPw, PASSWORD_BCRYPT);
+        $db = getDB();
+        $created = 0; $skipped = 0; $errors = [];
+        foreach ($list as $idx => $row) {
+            $name  = trim($row['name'] ?? '');
+            $phoneRaw = trim((string)($row['phone'] ?? ''));
+            // Tự thêm 0 nếu thiếu
+            if ($phoneRaw !== '' && $phoneRaw[0] !== '0' && ctype_digit($phoneRaw)) $phoneRaw = '0' . $phoneRaw;
+            $phone = sanitizePhone($phoneRaw);
+            $email = strtolower(trim($row['email'] ?? ''));
+            $sessions = max(0, (int)($row['sessions'] ?? 0));
+            if (!$name || strlen($phone) < 9) { $skipped++; $errors[] = "Dòng " . ($idx+1) . ": thiếu tên hoặc SĐT không hợp lệ"; continue; }
+            if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) { $skipped++; $errors[] = "Dòng " . ($idx+1) . ": email không hợp lệ"; continue; }
+            // Check trùng phone
+            $chk = $db->prepare("SELECT id FROM customers WHERE phone = ?");
+            $chk->execute([$phone]);
+            if ($chk->fetch()) { $skipped++; $errors[] = "Dòng " . ($idx+1) . " ($phone): SĐT đã tồn tại"; continue; }
+            // Check trùng email
+            if ($email) {
+                $chk2 = $db->prepare("SELECT id FROM customers WHERE email = ?");
+                $chk2->execute([$email]);
+                if ($chk2->fetch()) { $skipped++; $errors[] = "Dòng " . ($idx+1) . " ($email): email đã tồn tại"; continue; }
+            }
+            try {
+                $db->prepare("INSERT INTO customers (phone, name, email, password_hash, sessions, max_sessions, pkg) VALUES (?, ?, ?, ?, ?, ?, 'none')")
+                   ->execute([$phone, $name, $email ?: null, $defaultHash, $sessions, $sessions]);
+                $created++;
+            } catch (Exception $e) {
+                $skipped++; $errors[] = "Dòng " . ($idx+1) . ": " . $e->getMessage();
+            }
+        }
+        jsonResponse(['success' => true, 'created' => $created, 'skipped' => $skipped, 'errors' => $errors]);
+        break;
+
     // GET (admin): Xuất CSV danh sách thành viên
     case 'export_csv':
         if (($_GET['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) { http_response_code(401); echo 'Unauthorized'; exit; }
