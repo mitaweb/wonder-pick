@@ -1010,6 +1010,26 @@ function filterList(v) {
   ));
 }
 
+function confirmDeleteCustomer(phone, name) {
+  const input = prompt('Xóa tài khoản "' + name + '" (' + phone + ')?\nNhập "xóa" để xác nhận:');
+  if (input === null) return;
+  if (input.trim().toLowerCase() !== 'xóa' && input.trim().toLowerCase() !== 'xoa') {
+    alert('Bạn chưa nhập đúng "xóa". Hủy thao tác.');
+    return;
+  }
+  deleteCustomer(phone);
+}
+async function deleteCustomer(phone) {
+  try {
+    const res = await fetch(`${API_BASE}?action=delete_customer`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone, admin_token: adminToken})
+    });
+    const json = await res.json();
+    if (json.error) { alert('Lỗi: ' + json.error); return; }
+    loadDashboard();
+  } catch(e) { alert('Lỗi kết nối'); }
+}
 
 function openAddModal(phone, name, sessions) {
   addTargetPhone=phone;
