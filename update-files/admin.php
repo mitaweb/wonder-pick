@@ -242,6 +242,26 @@
             </table>
           </div>
           <div id="no-data" class="no-history hidden">Không có dữ liệu</div>
+          <!-- Phân trang -->
+          <div id="member-pager" style="display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:0.5px solid var(--border)">
+            <div style="font-size:12px;color:var(--text2)">
+              Hiển thị <strong id="member-page-from">1</strong>–<strong id="member-page-to">20</strong> / <strong id="member-page-total">0</strong> thành viên
+              &nbsp;·&nbsp;
+              <select id="member-page-size" style="font-size:12px;padding:2px 6px;border:0.5px solid var(--border2);border-radius:6px;background:var(--bg)" onchange="memberPageSizeChange()">
+                <option value="10">10/trang</option>
+                <option value="20" selected>20/trang</option>
+                <option value="50">50/trang</option>
+                <option value="100">100/trang</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button class="pager-btn" id="member-first" onclick="memberGoPage(1)">«</button>
+              <button class="pager-btn" id="member-prev" onclick="memberGoPage(memberPage-1)">‹ Trước</button>
+              <span id="member-page-info" style="font-size:12px;color:var(--text2);padding:0 8px"></span>
+              <button class="pager-btn" id="member-next" onclick="memberGoPage(memberPage+1)">Sau ›</button>
+              <button class="pager-btn" id="member-last" onclick="memberGoPage(memberTotalPages)">»</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -926,12 +946,29 @@ function approveFromQR() {
   if (currentQROrderId) approveOrder(currentQROrderId, document.getElementById('oqr-code').textContent);
 }
 
-// ---- MEMBERS ----
+// ---- MEMBERS + PAGINATION ----
+let memberPage = 1, memberTotalPages = 1, memberFiltered = [];
+
 function renderTable(customers) {
+  memberFiltered = customers;
+  memberPage = 1;
+  renderMemberPage();
+}
+
+function renderMemberPage() {
   const tbody = document.getElementById('customer-tbody');
-  if (!customers.length) { tbody.innerHTML=''; document.getElementById('no-data').classList.remove('hidden'); return; }
-  document.getElementById('no-data').classList.add('hidden');
-  tbody.innerHTML = customers.map(c => {
+  const noData = document.getElementById('no-data');
+  const pager = document.getElementById('member-pager');
+  const pageSize = parseInt(document.getElementById('member-page-size').value) || 20;
+  const total = memberFiltered.length;
+  if (!total) { tbody.innerHTML=''; noData.classList.remove('hidden'); pager.style.display='none'; return; }
+  noData.classList.add('hidden');
+  memberTotalPages = Math.ceil(total / pageSize);
+  if (memberPage < 1) memberPage = 1;
+  if (memberPage > memberTotalPages) memberPage = memberTotalPages;
+  const from = (memberPage - 1) * pageSize;
+  const slice = memberFiltered.slice(from, from + pageSize);
+  tbody.innerHTML = slice.map(c => {
     const s = parseInt(c.sessions);
     const badge = s===0?'badge-zero':s<=3?'badge-low':s<=6?'badge-mid':'badge-ok';
     const ph = c.phone.replace(/\D/g,'');
@@ -950,33 +987,29 @@ function renderTable(customers) {
       </td>
     </tr>`;
   }).join('');
+  pager.style.display = 'flex';
+  document.getElementById('member-page-from').textContent = from + 1;
+  document.getElementById('member-page-to').textContent = Math.min(from + pageSize, total);
+  document.getElementById('member-page-total').textContent = total;
+  document.getElementById('member-page-info').textContent = `Trang ${memberPage}/${memberTotalPages}`;
+  document.getElementById('member-first').disabled = memberPage <= 1;
+  document.getElementById('member-prev').disabled = memberPage <= 1;
+  document.getElementById('member-next').disabled = memberPage >= memberTotalPages;
+  document.getElementById('member-last').disabled = memberPage >= memberTotalPages;
 }
 
-function confirmDeleteCustomer(phone, name) {
-  const input = prompt(`Xóa tài khoản "${name}" (${phone})?\nNhập "xóa" để xác nhận:`);
-  if (input === null) return;
-  if (input.trim().toLowerCase() !== 'xóa' && input.trim().toLowerCase() !== 'xoa') {
-    alert('Bạn chưa nhập đúng "xóa". Hủy thao tác.');
-    return;
-  }
-  deleteCustomer(phone);
-}
-async function deleteCustomer(phone) {
-  try {
-    const res = await fetch(`${API_BASE}?action=delete_customer`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({phone, admin_token: adminToken})
-    });
-    const json = await res.json();
-    if (json.error) { alert('Lỗi: ' + json.error); return; }
-    loadDashboard();
-  } catch(e) { alert('Lỗi kết nối'); }
-}
+function memberGoPage(p) { memberPage = p; renderMemberPage(); }
+function memberPageSizeChange() { memberPage = 1; renderMemberPage(); }
 
 function filterList(v) {
   const q = v.toLowerCase();
-  renderTable(!q ? allCustomers : allCustomers.filter(c => c.name.toLowerCase().includes(q)||c.phone.includes(v.replace(/\D/g,''))||(c.email||'').toLowerCase().includes(q)));
+  renderTable(!q ? allCustomers : allCustomers.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    c.phone.includes(v.replace(/\D/g,'')) ||
+    (c.email||'').toLowerCase().includes(q)
+  ));
 }
+
 
 function openAddModal(phone, name, sessions) {
   addTargetPhone=phone;
