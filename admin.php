@@ -229,14 +229,14 @@
             </div>
           </div>
           <div style="overflow-x:auto">
-            <table class="data-table" id="customer-table" style="table-layout:fixed;width:100%">
+            <table class="data-table" id="customer-table">
               <thead><tr>
-                <th style="width:25%">Họ tên</th>
-                <th style="width:130px">SĐT</th>
-                <th>Email</th>
-                <th style="width:80px">Buổi</th>
-                <th style="width:100px">Hết hạn</th>
-                <th style="width:120px"></th>
+                <th>Họ tên</th>
+                <th>SĐT</th>
+                <th class="col-hide-mobile">Email</th>
+                <th>Buổi</th>
+                <th class="col-hide-mobile">Hết hạn</th>
+                <th></th>
               </tr></thead>
               <tbody id="customer-tbody"></tbody>
             </table>
@@ -938,17 +938,39 @@ function renderTable(customers) {
     const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
     const expiry = c.expires_at ? `<span style="font-size:11px;color:${new Date(c.expires_at)<new Date()?'var(--red)':'var(--text3)'}">${new Date(c.expires_at).toLocaleDateString('vi-VN')}</span>` : '—';
     return `<tr>
-      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${esc(c.name)}</strong></td>
+      <td style="white-space:nowrap"><strong>${esc(c.name)}</strong></td>
       <td style="white-space:nowrap"><code style="font-size:12px">${phFmt}</code></td>
-      <td style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'—')}</td>
+      <td class="col-hide-mobile" style="font-size:12px;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'—')}</td>
       <td style="text-align:center"><span class="sess-badge ${badge}">${s}</span></td>
-      <td style="white-space:nowrap">${expiry}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;margin-right:4px" onclick="openEditModal('${esc(c.phone)}')">✏ Sửa</button>
-        <button class="btn btn-sm btn-primary" onclick="openAddModal('${esc(c.phone)}','${esc(c.name)}',${s})">+ Cộng</button>
+      <td class="col-hide-mobile" style="white-space:nowrap">${expiry}</td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px" onclick="openEditModal('${esc(c.phone)}')">Sửa</button>
+        <button class="btn btn-sm btn-primary" style="font-size:11px;padding:3px 8px" onclick="openAddModal('${esc(c.phone)}','${esc(c.name)}',${s})">Cộng</button>
+        <button class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--red);border:1px solid var(--red);background:none" onclick="confirmDeleteCustomer('${esc(c.phone)}','${esc(c.name)}')">Xóa</button>
       </td>
     </tr>`;
   }).join('');
+}
+
+function confirmDeleteCustomer(phone, name) {
+  const input = prompt(`Xóa tài khoản "${name}" (${phone})?\nNhập "xóa" để xác nhận:`);
+  if (input === null) return;
+  if (input.trim().toLowerCase() !== 'xóa' && input.trim().toLowerCase() !== 'xoa') {
+    alert('Bạn chưa nhập đúng "xóa". Hủy thao tác.');
+    return;
+  }
+  deleteCustomer(phone);
+}
+async function deleteCustomer(phone) {
+  try {
+    const res = await fetch(`${API_BASE}?action=delete_customer`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone, admin_token: adminToken})
+    });
+    const json = await res.json();
+    if (json.error) { alert('Lỗi: ' + json.error); return; }
+    loadDashboard();
+  } catch(e) { alert('Lỗi kết nối'); }
 }
 
 function filterList(v) {
