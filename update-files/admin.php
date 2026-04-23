@@ -229,10 +229,14 @@
             </div>
           </div>
           <div style="overflow-x:auto">
-            <table class="data-table" id="customer-table">
+            <table class="data-table" id="customer-table" style="table-layout:fixed;width:100%">
               <thead><tr>
-                <th>Họ tên</th><th>Số điện thoại</th><th>Email</th>
-                <th>Buổi còn lại</th><th>Hết hạn</th><th></th>
+                <th style="width:25%">Họ tên</th>
+                <th style="width:130px">SĐT</th>
+                <th>Email</th>
+                <th style="width:80px">Buổi</th>
+                <th style="width:100px">Hết hạn</th>
+                <th style="width:120px"></th>
               </tr></thead>
               <tbody id="customer-tbody"></tbody>
             </table>
@@ -934,11 +938,11 @@ function renderTable(customers) {
     const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
     const expiry = c.expires_at ? `<span style="font-size:11px;color:${new Date(c.expires_at)<new Date()?'var(--red)':'var(--text3)'}">${new Date(c.expires_at).toLocaleDateString('vi-VN')}</span>` : '—';
     return `<tr>
-      <td><strong>${esc(c.name)}</strong></td>
-      <td><code style="font-size:12px">${phFmt}</code></td>
-      <td style="font-size:12px;color:var(--text2)">${esc(c.email||'—')}</td>
-      <td><span class="sess-badge ${badge}">${s}</span></td>
-      <td>${expiry}</td>
+      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${esc(c.name)}</strong></td>
+      <td style="white-space:nowrap"><code style="font-size:12px">${phFmt}</code></td>
+      <td style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'—')}</td>
+      <td style="text-align:center"><span class="sess-badge ${badge}">${s}</span></td>
+      <td style="white-space:nowrap">${expiry}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;margin-right:4px" onclick="openEditModal('${esc(c.phone)}')">✏ Sửa</button>
         <button class="btn btn-sm btn-primary" onclick="openAddModal('${esc(c.phone)}','${esc(c.name)}',${s})">+ Cộng</button>
