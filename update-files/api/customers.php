@@ -186,6 +186,23 @@ switch ($action) {
         jsonResponse(['success' => true, 'data' => $updated->fetch()]);
         break;
 
+    // POST (admin): Xóa tài khoản khách hàng
+    case 'delete_customer':
+        $input = getJsonInput();
+        if (($input['admin_token'] ?? '') !== \md5(ADMIN_PASSWORD)) jsonResponse(['error' => 'Unauthorized'], 401);
+        $phone = sanitizePhone($input['phone'] ?? '');
+        if (!$phone) jsonResponse(['error' => 'Thiếu số điện thoại'], 400);
+        $db = getDB();
+        $chk = $db->prepare("SELECT id FROM customers WHERE phone = ?");
+        $chk->execute([$phone]);
+        if (!$chk->fetch()) jsonResponse(['error' => 'Không tìm thấy khách hàng'], 404);
+        $db->prepare("DELETE FROM checkins WHERE phone = ?")->execute([$phone]);
+        $db->prepare("DELETE FROM session_packages WHERE phone = ?")->execute([$phone]);
+        $db->prepare("DELETE FROM orders WHERE phone = ?")->execute([$phone]);
+        $db->prepare("DELETE FROM customers WHERE phone = ?")->execute([$phone]);
+        jsonResponse(['success' => true]);
+        break;
+
     // POST (admin): Tạo hàng loạt tài khoản khách hàng
     // Body: { admin_token, default_password, customers:[{name,phone,email,sessions}] }
     case 'bulk_create':
