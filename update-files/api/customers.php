@@ -10,6 +10,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $action = $_GET['action'] ?? '';
 
+// Rate limiting cho endpoint public (get, register, checkin)
+if (in_array($action, ['get', 'register', 'checkin'])) {
+    rateLimit('customers_' . $action, 30, 60);
+}
+
 switch ($action) {
 
     case 'get':
