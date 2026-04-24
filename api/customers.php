@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $action = $_GET['action'] ?? '';
 
-// Rate limiting cho endpoint public (get, register, checkin)
-if (in_array($action, ['get', 'register', 'checkin'])) {
+// Rate limiting cho endpoint public (get, register, checkin, search_name)
+if (in_array($action, ['get', 'register', 'checkin', 'search_name'])) {
     rateLimit('customers_' . $action, 30, 60);
 }
 
@@ -38,6 +38,16 @@ switch ($action) {
         $stmt2->execute([$phone]);
         $checkins = $stmt2->fetchAll();
         jsonResponse(['data' => $customer, 'checkins' => $checkins, 'expired' => $expired]);
+        break;
+
+    case 'search_name':
+        $keyword = trim($_GET['q'] ?? '');
+        if (mb_strlen($keyword) < 1) jsonResponse(['error' => 'Từ khóa quá ngắn'], 400);
+        $db = getDB();
+        $stmt = $db->prepare("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE name LIKE ? ORDER BY name ASC LIMIT 20");
+        $stmt->execute(['%' . $keyword . '%']);
+        $matches = $stmt->fetchAll();
+        jsonResponse(['matches' => $matches, 'partial' => true]);
         break;
 
     case 'register':

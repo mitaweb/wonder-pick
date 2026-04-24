@@ -166,8 +166,8 @@
           <h3 style="font-size:16px;font-weight:500;margin-bottom:12px">Check-in khách hàng</h3>
           <div style="display:flex;gap:8px;margin-bottom:12px">
             <div style="flex:1;position:relative">
-              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">📱</span>
-              <input type="tel" id="ci-phone-input" class="form-input" style="padding-left:38px;font-size:15px" placeholder="Nhập 4 số cuối hoặc SĐT đầy đủ..." maxlength="12" onkeydown="if(event.key==='Enter')ciSearch()">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%)">🔍</span>
+              <input type="text" id="ci-phone-input" class="form-input" style="padding-left:38px;font-size:15px" placeholder="Nhập tên, 4 số cuối hoặc SĐT đầy đủ..." onkeydown="if(event.key==='Enter')ciSearch()">
             </div>
             <button class="btn btn-primary" onclick="ciSearch()">Tìm</button>
             <button class="btn btn-outline" id="ci-scan-btn" onclick="ciStartQR()">📷 QR</button>
@@ -1613,10 +1613,28 @@ function exportReport() {
 let ciCustomer = null, ciPeople = 1, ciQrScanner = null;
 
 function ciSearch() {
-  const raw = document.getElementById('ci-phone-input').value.replace(/\D/g,'');
-  if (raw.length < 4) { showAlert('ci-search-alert','Nhập tối thiểu 4 số cuối','warn'); return; }
+  const val = document.getElementById('ci-phone-input').value.trim();
+  if (!val) { showAlert('ci-search-alert','Vui lòng nhập tên hoặc số điện thoại','warn'); return; }
   hideAlert('ci-search-alert');
   document.getElementById('ci-matches-list').innerHTML = '';
+
+  // Nếu có chữ cái → tìm theo tên
+  const isName = /[a-zA-ZÀ-ỹ]/.test(val);
+  if (isName) {
+    fetch(`${API_BASE}?action=search_name&q=${encodeURIComponent(val)}`)
+      .then(r=>r.json()).then(json => {
+        const list = json.matches || [];
+        if (list.length === 0) { showAlert('ci-search-alert','Không tìm thấy khách hàng','error'); document.getElementById('ci-customer-panel').classList.add('hidden'); return; }
+        if (list.length === 1) { ciSelectMatch(list[0].phone); return; }
+        renderCiMatches(list);
+        document.getElementById('ci-customer-panel').classList.add('hidden');
+      }).catch(()=>showAlert('ci-search-alert','Lỗi kết nối','error'));
+    return;
+  }
+
+  // Tìm theo số điện thoại
+  const raw = val.replace(/\D/g,'');
+  if (raw.length < 4) { showAlert('ci-search-alert','Nhập tối thiểu 4 số cuối','warn'); return; }
   fetch(`${API_BASE}?action=get&phone=${raw}`)
     .then(r=>r.json()).then(json => {
       if (json.partial) {
