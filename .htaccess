@@ -1,0 +1,20 @@
+# ================================================
+# Wonder Pickleball — Chống bot / spam
+# ================================================
+
+# --- 1. Chặn các IP spam đã biết ---
+<RequireAll>
+    Require all granted
+    Require not ip 103.56.163.10
+    Require not ip 103.166.183.10
+    Require not ip 103.216.118.10
+</RequireAll>
+
+# --- 2. Chặn request không có User-Agent (bot) ---
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} ^-?$ [OR]
+RewriteCond %{HTTP_USER_AGENT} ^$
+RewriteRule .* - [F,L]
+
+# --- 3. Giới hạn kích thước request body (chống POST spam) ---
+LimitRequestBody 1048576
