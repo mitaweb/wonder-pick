@@ -188,6 +188,29 @@ function getBankConfig(): array {
     ];
 }
 
+// ---- Email queue (gửi email không đồng bộ) ----
+function queueMail(string $toEmail, string $toName, string $subject, string $htmlBody): void {
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS email_queue (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            to_email VARCHAR(255) NOT NULL,
+            to_name VARCHAR(255) NOT NULL,
+            subject VARCHAR(255) NOT NULL,
+            body MEDIUMTEXT NOT NULL,
+            status ENUM('pending','sent','failed') DEFAULT 'pending',
+            attempts INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sent_at DATETIME DEFAULT NULL,
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $db->prepare("INSERT INTO email_queue (to_email, to_name, subject, body) VALUES (?, ?, ?, ?)")
+           ->execute([$toEmail, $toName, $subject, $htmlBody]);
+    } catch (\Throwable $e) {
+        error_log('[WP Mail Queue] ' . $e->getMessage());
+    }
+}
+
 // ---- Rate limiting (chống spam) ----
 function rateLimit(string $scope = 'global', int $maxRequests = 30, int $windowSeconds = 60): void {
     $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';

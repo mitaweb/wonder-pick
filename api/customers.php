@@ -86,7 +86,7 @@ switch ($action) {
             $updated->execute([$phone]);
             $updatedData = $updated->fetch();
 
-            // Gửi email thông báo check-in nếu có email
+            // Gửi email thông báo check-in (qua queue, không chờ đợi)
             $custEmail = $updatedData['email'] ?? '';
             $smtpEnabled = getSetting('smtp_enabled', '0');
             if ($custEmail && $smtpEnabled === '1') {
@@ -104,7 +104,7 @@ switch ($action) {
                     </table>
                     <p>Chúc bạn chơi vui vẻ! 🏓</p>"
                 );
-                sendMail($custEmail, $updatedData['name'], '[Wonder Pickleball] Check-in thành công', $html);
+                queueMail($custEmail, $updatedData['name'], '[Wonder Pickleball] Check-in thành công', $html);
             }
 
             jsonResponse(['success' => true, 'data' => $updatedData, 'sessions_before' => $before, 'sessions_after' => $after, 'people_count' => $count]);
