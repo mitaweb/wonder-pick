@@ -176,6 +176,28 @@ switch ($action) {
         jsonResponse(['valid' => (bool)$row]);
         break;
 
+    // POST: Thành viên tự đổi mật khẩu
+    // Body: { phone, current_password, new_password }
+    case 'change_password':
+        $input       = getJsonInput();
+        $phone       = sanitizePhone($input['phone'] ?? '');
+        $currentPw   = $input['current_password'] ?? '';
+        $newPw       = $input['new_password'] ?? '';
+        if (!$phone || !$currentPw || !$newPw) jsonResponse(['error' => 'Thiếu thông tin'], 400);
+        if (strlen($newPw) < 6) jsonResponse(['error' => 'Mật khẩu mới tối thiểu 6 ký tự'], 400);
+        $db = getDB();
+        $stmt = $db->prepare("SELECT id, password_hash FROM customers WHERE phone = ?");
+        $stmt->execute([$phone]);
+        $customer = $stmt->fetch();
+        if (!$customer) jsonResponse(['error' => 'Không tìm thấy tài khoản'], 404);
+        if (!$customer['password_hash'] || !password_verify($currentPw, $customer['password_hash'])) {
+            jsonResponse(['error' => 'Mật khẩu hiện tại không đúng'], 401);
+        }
+        $hash = password_hash($newPw, PASSWORD_BCRYPT);
+        $db->prepare("UPDATE customers SET password_hash = ? WHERE id = ?")->execute([$hash, $customer['id']]);
+        jsonResponse(['success' => true]);
+        break;
+
     // POST: Admin đăng nhập
     // Body: { password }
     case 'admin_login':
