@@ -1,6 +1,26 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 
+function removeVietnameseDiacritics($str) {
+    $str = mb_strtolower($str, 'UTF-8');
+    $map = [
+        'à'=>'a','á'=>'a','ả'=>'a','ã'=>'a','ạ'=>'a',
+        'ă'=>'a','ằ'=>'a','ắ'=>'a','ẳ'=>'a','ẵ'=>'a','ặ'=>'a',
+        'â'=>'a','ầ'=>'a','ấ'=>'a','ẩ'=>'a','ẫ'=>'a','ậ'=>'a',
+        'đ'=>'d',
+        'è'=>'e','é'=>'e','ẻ'=>'e','ẽ'=>'e','ẹ'=>'e',
+        'ê'=>'e','ề'=>'e','ế'=>'e','ể'=>'e','ễ'=>'e','ệ'=>'e',
+        'ì'=>'i','í'=>'i','ỉ'=>'i','ĩ'=>'i','ị'=>'i',
+        'ò'=>'o','ó'=>'o','ỏ'=>'o','õ'=>'o','ọ'=>'o',
+        'ô'=>'o','ồ'=>'o','ố'=>'o','ổ'=>'o','ỗ'=>'o','ộ'=>'o',
+        'ơ'=>'o','ờ'=>'o','ớ'=>'o','ở'=>'o','ỡ'=>'o','ợ'=>'o',
+        'ù'=>'u','ú'=>'u','ủ'=>'u','ũ'=>'u','ụ'=>'u',
+        'ư'=>'u','ừ'=>'u','ứ'=>'u','ử'=>'u','ữ'=>'u','ự'=>'u',
+        'ỳ'=>'y','ý'=>'y','ỷ'=>'y','ỹ'=>'y','ỵ'=>'y',
+    ];
+    return strtr($str, $map);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -44,9 +64,17 @@ switch ($action) {
         $keyword = trim($_GET['q'] ?? '');
         if (mb_strlen($keyword) < 1) jsonResponse(['error' => 'Từ khóa quá ngắn'], 400);
         $db = getDB();
-        $stmt = $db->prepare("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE name LIKE ? ORDER BY name ASC LIMIT 20");
-        $stmt->execute(['%' . $keyword . '%']);
-        $matches = $stmt->fetchAll();
+        $keyNorm = removeVietnameseDiacritics($keyword);
+        $stmt = $db->prepare("SELECT phone, name, sessions, max_sessions, expires_at FROM customers ORDER BY name ASC");
+        $stmt->execute();
+        $all = $stmt->fetchAll();
+        $matches = [];
+        foreach ($all as $c) {
+            if (mb_strpos(removeVietnameseDiacritics($c['name']), $keyNorm) !== false) {
+                $matches[] = $c;
+                if (count($matches) >= 20) break;
+            }
+        }
         jsonResponse(['matches' => $matches, 'partial' => true]);
         break;
 
