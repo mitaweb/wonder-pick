@@ -34,11 +34,19 @@ function ensureInventoryTables($db) {
 
     $db->exec("CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        customer_phone VARCHAR(20),
+        customer_name VARCHAR(100),
         total_amount DECIMAL(12,0) DEFAULT 0,
         total_cost DECIMAL(12,0) DEFAULT 0,
         note VARCHAR(255),
         created_at DATETIME DEFAULT NOW()
     ) CHARACTER SET utf8mb4");
+
+    // Migrate: add customer columns if missing
+    try {
+        $db->exec("ALTER TABLE sales ADD COLUMN customer_phone VARCHAR(20) AFTER id");
+        $db->exec("ALTER TABLE sales ADD COLUMN customer_name VARCHAR(100) AFTER customer_phone");
+    } catch (Exception $e) {}
 
     $db->exec("CREATE TABLE IF NOT EXISTS sale_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -145,8 +153,10 @@ switch ($action) {
     // ---- SALES (bán hàng) ----
 
     case 'create_sale':
-        $items = $input['items'] ?? [];
-        $note  = trim($input['note'] ?? '');
+        $items          = $input['items'] ?? [];
+        $note           = trim($input['note'] ?? '');
+        $customer_phone = trim($input['customer_phone'] ?? '');
+        $customer_name  = trim($input['customer_name'] ?? '');
         if (empty($items)) jsonResponse(['error' => 'Giỏ hàng trống'], 400);
 
         $total_amount = 0;
@@ -169,8 +179,8 @@ switch ($action) {
 
         $db->beginTransaction();
         try {
-            $db->prepare("INSERT INTO sales (total_amount, total_cost, note) VALUES (?,?,?)")
-               ->execute([$total_amount, $total_cost, $note]);
+            $db->prepare("INSERT INTO sales (customer_phone, customer_name, total_amount, total_cost, note) VALUES (?,?,?,?,?)")
+               ->execute([$customer_phone ?: null, $customer_name ?: null, $total_amount, $total_cost, $note]);
             $sale_id = $db->lastInsertId();
             foreach ($rows as $r) {
                 $p = $r['product'];

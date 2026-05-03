@@ -426,7 +426,7 @@
               </div>
               <div style="overflow-x:auto">
                 <table class="data-table" style="min-width:480px">
-                  <thead><tr><th>Thời gian</th><th>Hàng hóa</th><th>Tổng tiền</th><th></th></tr></thead>
+                  <thead><tr><th>Thời gian</th><th>Khách</th><th>Hàng hóa</th><th>Tổng tiền</th><th></th></tr></thead>
                   <tbody id="sales-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">Đang tải...</td></tr></tbody>
                 </table>
               </div>
@@ -436,6 +436,21 @@
           <div class="table-card" style="position:sticky;top:16px">
             <h3 style="font-size:15px;font-weight:500;margin-bottom:12px">🛒 Giỏ hàng</h3>
             <div id="sale-alert" class="alert hidden"></div>
+            <!-- Chọn khách hàng -->
+            <div style="margin-bottom:12px">
+              <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Khách hàng</label>
+              <div id="sale-customer-selected" class="hidden" style="display:none;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius-lg);margin-bottom:4px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600" id="sale-cust-name"></div>
+                  <div style="font-size:11px;color:var(--text2)" id="sale-cust-phone"></div>
+                </div>
+                <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px" onclick="clearSaleCustomer()">✕</button>
+              </div>
+              <div id="sale-customer-search-wrap" style="position:relative">
+                <input type="text" id="sale-cust-input" class="form-input" style="font-size:13px" placeholder="Tìm tên hoặc SĐT khách..." oninput="saleCustomerSearch()" autocomplete="off">
+                <div id="sale-cust-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);z-index:10;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12)"></div>
+              </div>
+            </div>
             <div id="cart-list" style="min-height:80px"></div>
             <div style="border-top:0.5px solid var(--border2);margin:12px 0;padding-top:12px">
               <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600">
@@ -2264,17 +2279,82 @@ function renderCart() {
   totalEl.textContent = formatMoney(total) + 'đ';
 }
 
+// ---- Sale Customer Selection ----
+let saleCustomer = null;
+let saleCustTimer;
+
+function saleCustomerSearch() {
+  clearTimeout(saleCustTimer);
+  saleCustTimer = setTimeout(async () => {
+    const q = document.getElementById('sale-cust-input').value.trim();
+    const box = document.getElementById('sale-cust-suggestions');
+    if (q.length < 2) { box.style.display='none'; return; }
+    try {
+      const isName = /[a-zA-ZÀ-ỹ]/.test(q);
+      const url = isName
+        ? `${API_BASE}?action=search_name&q=${encodeURIComponent(q)}`
+        : `${API_BASE}?action=get&phone=${q.replace(/\D/g,'')}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      let list = [];
+      if (json.partial) list = json.matches || [];
+      else if (json.data) list = [json.data];
+      if (!list.length) { box.style.display='none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = list.map(c => {
+        const ph = (c.phone||'').replace(/\D/g,'');
+        const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+        return `<div onclick="selectSaleCustomer('${esc(ph)}','${esc(c.name||'')}')"
+          style="padding:10px 14px;cursor:pointer;border-bottom:0.5px solid var(--border2);display:flex;justify-content:space-between"
+          onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+          <div style="font-size:13px;font-weight:500">${esc(c.name||'—')}</div>
+          <div style="font-size:12px;color:var(--text2)">${phFmt}</div>
+        </div>`;
+      }).join('');
+    } catch(e) { box.style.display='none'; }
+  }, 250);
+}
+
+function selectSaleCustomer(phone, name) {
+  saleCustomer = {phone, name};
+  document.getElementById('sale-cust-name').textContent = name;
+  const ph = phone.replace(/\D/g,'');
+  document.getElementById('sale-cust-phone').textContent = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
+  document.getElementById('sale-customer-selected').style.display = 'flex';
+  document.getElementById('sale-customer-selected').classList.remove('hidden');
+  document.getElementById('sale-customer-search-wrap').style.display = 'none';
+  document.getElementById('sale-cust-suggestions').style.display = 'none';
+}
+
+function clearSaleCustomer() {
+  saleCustomer = null;
+  document.getElementById('sale-customer-selected').style.display = 'none';
+  document.getElementById('sale-customer-search-wrap').style.display = '';
+  document.getElementById('sale-cust-input').value = '';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#sale-cust-input') && !e.target.closest('#sale-cust-suggestions'))
+    document.getElementById('sale-cust-suggestions') && (document.getElementById('sale-cust-suggestions').style.display='none');
+});
+
 async function completeSale() {
   if (!cart.length) { showAlert('sale-alert','Giỏ hàng trống','warn'); return; }
   const note  = document.getElementById('sale-note').value.trim();
   const items = cart.map(c => ({product_id:c.id, quantity:c.qty}));
+  const body  = {items, note, admin_token:adminToken};
+  if (saleCustomer) {
+    body.customer_phone = saleCustomer.phone;
+    body.customer_name  = saleCustomer.name;
+  }
   try {
     const res = await fetch(`${API_INV}?action=create_sale`, {method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({items, note, admin_token:adminToken})});
+      body:JSON.stringify(body)});
     const json = await res.json();
     if (json.error) { showAlert('sale-alert',json.error,'error'); return; }
     cart = [];
     document.getElementById('sale-note').value = '';
+    clearSaleCustomer();
     renderCart();
     showAlert('sale-alert',`Đã bán thành công! Tổng: ${formatMoney(json.total_amount)}đ`,'success');
     loadSales(); loadProducts();
@@ -2288,11 +2368,12 @@ async function loadSales() {
   try {
     const res = await fetch(`${API_INV}?action=list_sales&date=${date}&admin_token=${adminToken}`);
     const json = await res.json();
-    if (!json.data?.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:16px">Chưa có đơn nào</td></tr>'; return; }
+    if (!json.data?.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">Chưa có đơn nào</td></tr>'; return; }
     tbody.innerHTML = json.data.map(s => `
       <tr>
         <td style="font-size:12px">${formatDateTime(s.created_at)}</td>
-        <td style="font-size:12px;color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.items_summary||'')}</td>
+        <td style="font-size:12px">${s.customer_name?esc(s.customer_name):'<span style="color:var(--text3)">—</span>'}</td>
+        <td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.items_summary||'')}</td>
         <td style="font-weight:600;color:var(--green)">${formatMoney(s.total_amount)}đ</td>
         <td style="white-space:nowrap">
           <button class="btn btn-ghost" style="font-size:11px;padding:3px 7px" onclick="viewSaleDetail(${s.id})">Chi tiết</button>
@@ -2308,6 +2389,7 @@ async function viewSaleDetail(id) {
     const json = await res.json();
     const s = json.sale; const items = json.items||[];
     document.getElementById('sale-detail-content').innerHTML = `
+      ${s.customer_name?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">👤 ${esc(s.customer_name)} <span style="font-weight:400;color:var(--text2);font-size:12px">${s.customer_phone||''}</span></div>`:''}
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${formatDateTime(s.created_at)}${s.note?` · ${esc(s.note)}`:''}</div>
       <table class="data-table" style="margin-bottom:12px">
         <thead><tr><th>Sản phẩm</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
