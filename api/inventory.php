@@ -54,7 +54,7 @@ function ensureInventoryTables($db) {
 // All endpoints require admin token
 $input = getJsonInput();
 $token = $_GET['admin_token'] ?? ($input['admin_token'] ?? '');
-verifyAdmin($token);
+if ($token !== md5(ADMIN_PASSWORD)) jsonResponse(['error' => 'Unauthorized'], 401);
 
 $db = getDB();
 ensureInventoryTables($db);
