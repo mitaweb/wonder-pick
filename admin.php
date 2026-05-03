@@ -2091,7 +2091,7 @@ async function loadInventoryLogs() {
       <tr>
         <td style="font-size:12px;color:var(--text2)">${formatDateTime(l.created_at)}</td>
         <td>${esc(l.product_name)}</td>
-        <td><span style="color:${l.type==='in'?'var(--green)':'var(--red)';}">${l.type==='in'?'+':'−'}${l.quantity}</span></td>
+        <td><span style="color:${l.type==='in'?'var(--green)':'var(--red)'}">${l.type==='in'?'+':'−'}${l.quantity}</span></td>
         <td style="font-size:12px;color:var(--text2)">${esc(l.note||'')}</td>
       </tr>`).join('');
   } catch(e) {}
