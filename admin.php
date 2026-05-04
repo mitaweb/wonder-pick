@@ -426,7 +426,7 @@
               </div>
               <div style="overflow-x:auto">
                 <table class="data-table" style="min-width:480px">
-                  <thead><tr><th>Thời gian</th><th>Khách</th><th>Hàng hóa</th><th>Tổng tiền</th><th></th></tr></thead>
+                  <thead><tr><th>Thời gian</th><th>Khách</th><th>Hàng hóa</th><th>PTTT</th><th>Tổng tiền</th><th></th></tr></thead>
                   <tbody id="sales-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">Đang tải...</td></tr></tbody>
                 </table>
               </div>
@@ -456,6 +456,17 @@
               <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600">
                 <span>Tổng cộng</span>
                 <span id="cart-total" style="color:var(--green)">0đ</span>
+              </div>
+            </div>
+            <div style="margin-bottom:10px">
+              <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Phương thức thanh toán</label>
+              <div style="display:flex;gap:8px">
+                <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--green);border-radius:var(--radius-lg);cursor:pointer;font-size:13px;font-weight:500;background:rgba(52,199,89,.06)">
+                  <input type="radio" name="sale-payment" value="cash" checked style="accent-color:var(--green)"> 💵 Tiền mặt
+                </label>
+                <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--border2);border-radius:var(--radius-lg);cursor:pointer;font-size:13px;font-weight:500" id="label-transfer">
+                  <input type="radio" name="sale-payment" value="transfer" style="accent-color:var(--green)"> 🏦 Chuyển khoản
+                </label>
               </div>
             </div>
             <textarea id="sale-note" class="form-input" rows="2" placeholder="Ghi chú đơn (không bắt buộc)" style="font-size:13px;margin-bottom:10px;resize:none"></textarea>
@@ -2338,11 +2349,22 @@ document.addEventListener('click', e => {
     document.getElementById('sale-cust-suggestions') && (document.getElementById('sale-cust-suggestions').style.display='none');
 });
 
+// Radio button style toggle
+document.querySelectorAll('input[name="sale-payment"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('input[name="sale-payment"]').forEach(rb => {
+      rb.closest('label').style.borderColor = rb.checked ? 'var(--green)' : 'var(--border2)';
+      rb.closest('label').style.background  = rb.checked ? 'rgba(52,199,89,.06)' : '';
+    });
+  });
+});
+
 async function completeSale() {
   if (!cart.length) { showAlert('sale-alert','Giỏ hàng trống','warn'); return; }
-  const note  = document.getElementById('sale-note').value.trim();
-  const items = cart.map(c => ({product_id:c.id, quantity:c.qty}));
-  const body  = {items, note, admin_token:adminToken};
+  const note    = document.getElementById('sale-note').value.trim();
+  const payment = document.querySelector('input[name="sale-payment"]:checked').value;
+  const items   = cart.map(c => ({product_id:c.id, quantity:c.qty}));
+  const body    = {items, note, payment_method: payment, admin_token:adminToken};
   if (saleCustomer) {
     body.customer_phone = saleCustomer.phone;
     body.customer_name  = saleCustomer.name;
@@ -2354,6 +2376,11 @@ async function completeSale() {
     if (json.error) { showAlert('sale-alert',json.error,'error'); return; }
     cart = [];
     document.getElementById('sale-note').value = '';
+    document.querySelector('input[name="sale-payment"][value="cash"]').checked = true;
+    document.querySelectorAll('input[name="sale-payment"]').forEach(rb => {
+      rb.closest('label').style.borderColor = rb.checked ? 'var(--green)' : 'var(--border2)';
+      rb.closest('label').style.background  = rb.checked ? 'rgba(52,199,89,.06)' : '';
+    });
     clearSaleCustomer();
     renderCart();
     showAlert('sale-alert',`Đã bán thành công! Tổng: ${formatMoney(json.total_amount)}đ`,'success');
@@ -2368,18 +2395,20 @@ async function loadSales() {
   try {
     const res = await fetch(`${API_INV}?action=list_sales&date=${date}&admin_token=${adminToken}`);
     const json = await res.json();
-    if (!json.data?.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">Chưa có đơn nào</td></tr>'; return; }
-    tbody.innerHTML = json.data.map(s => `
-      <tr>
+    if (!json.data?.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">Chưa có đơn nào</td></tr>'; return; }
+    tbody.innerHTML = json.data.map(s => {
+      const pm = s.payment_method==='transfer'?'🏦 CK':'💵 TM';
+      return `<tr>
         <td style="font-size:12px">${formatDateTime(s.created_at)}</td>
         <td style="font-size:12px">${s.customer_name?esc(s.customer_name):'<span style="color:var(--text3)">—</span>'}</td>
         <td style="font-size:12px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.items_summary||'')}</td>
+        <td style="font-size:12px">${pm}</td>
         <td style="font-weight:600;color:var(--green)">${formatMoney(s.total_amount)}đ</td>
         <td style="white-space:nowrap">
           <button class="btn btn-ghost" style="font-size:11px;padding:3px 7px" onclick="viewSaleDetail(${s.id})">Chi tiết</button>
           <button class="btn" style="font-size:11px;padding:3px 7px;background:var(--red);color:white;border:none;border-radius:var(--radius);cursor:pointer" onclick="deleteSale(${s.id})">Huỷ</button>
         </td>
-      </tr>`).join('');
+      </tr>`;}).join('');
   } catch(e) {}
 }
 
@@ -2390,7 +2419,7 @@ async function viewSaleDetail(id) {
     const s = json.sale; const items = json.items||[];
     document.getElementById('sale-detail-content').innerHTML = `
       ${s.customer_name?`<div style="font-size:13px;font-weight:500;margin-bottom:6px">👤 ${esc(s.customer_name)} <span style="font-weight:400;color:var(--text2);font-size:12px">${s.customer_phone||''}</span></div>`:''}
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${formatDateTime(s.created_at)}${s.note?` · ${esc(s.note)}`:''}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${formatDateTime(s.created_at)} · ${s.payment_method==='transfer'?'🏦 Chuyển khoản':'💵 Tiền mặt'}${s.note?` · ${esc(s.note)}`:''}</div>
       <table class="data-table" style="margin-bottom:12px">
         <thead><tr><th>Sản phẩm</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
         <tbody>${items.map(i=>`<tr><td>${esc(i.product_name)}</td><td>${i.quantity}</td><td>${formatMoney(i.sell_price)}đ</td><td>${formatMoney(i.sell_price*i.quantity)}đ</td></tr>`).join('')}</tbody>
