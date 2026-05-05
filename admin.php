@@ -782,6 +782,12 @@
       <label style="font-size:12px;color:var(--text2)">Đặt mật khẩu mới <span style="opacity:.5">(để trống = không đổi)</span></label>
       <input type="text" id="edit-password" class="form-input" placeholder="Nhập mật khẩu mới...">
     </div>
+    <div class="form-group" style="margin-top:4px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="edit-walkin" style="accent-color:var(--green);width:16px;height:16px">
+        Tài khoản khách lẻ <span style="font-size:11px;color:var(--text3)">(check-in luôn tính vãng lai)</span>
+      </label>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeEditModal()">Hủy</button>
       <button class="btn btn-primary" onclick="saveEditMember()">Lưu thay đổi</button>
@@ -1176,7 +1182,7 @@ function renderMemberPage() {
     const phFmt = ph.slice(0,4)+' '+ph.slice(4,7)+' '+ph.slice(7);
     const expiry = c.expires_at ? `<span style="font-size:11px;color:${new Date(c.expires_at)<new Date()?'var(--red)':'var(--text3)'}">${new Date(c.expires_at).toLocaleDateString('vi-VN')}</span>` : '—';
     return `<tr>
-      <td style="white-space:nowrap"><strong>${esc(c.name)}</strong></td>
+      <td style="white-space:nowrap"><strong>${esc(c.name)}</strong>${parseInt(c.is_walkin)?'<span style="font-size:10px;background:var(--bg2);color:var(--text2);padding:1px 5px;border-radius:4px;margin-left:6px">Khách lẻ</span>':''}</td>
       <td style="white-space:nowrap"><code style="font-size:12px">${phFmt}</code></td>
       <td class="col-hide-mobile" style="font-size:12px;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'—')}</td>
       <td style="text-align:center"><span class="sess-badge ${badge}">${s}</span></td>
@@ -1296,6 +1302,7 @@ function openEditModal(phone) {
   document.getElementById('edit-max-sessions').value = c.max_sessions;
   document.getElementById('edit-expiry').value = c.expires_at || '';
   document.getElementById('edit-password').value = '';
+  document.getElementById('edit-walkin').checked = !!parseInt(c.is_walkin);
   hideAlert('edit-modal-alert');
   document.getElementById('edit-modal').classList.remove('hidden');
 }
@@ -1311,6 +1318,7 @@ async function saveEditMember() {
     sessions: parseInt(document.getElementById('edit-sessions').value) || 0,
     max_sessions: parseInt(document.getElementById('edit-max-sessions').value) || 0,
     expires_at: document.getElementById('edit-expiry').value || null,
+    is_walkin: document.getElementById('edit-walkin').checked ? 1 : 0,
     admin_token: adminToken
   };
   const newPw = document.getElementById('edit-password').value;

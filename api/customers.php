@@ -208,8 +208,14 @@ switch ($action) {
 
         if (!$name) jsonResponse(['error' => 'Tên không được để trống'], 400);
 
+        $isWalkin = isset($input['is_walkin']) ? (int)$input['is_walkin'] : null;
+
         $db->prepare("UPDATE customers SET name = ?, email = ?, sessions = ?, max_sessions = ?, expires_at = ? WHERE phone = ?")
            ->execute([$name, $email ?: null, $sessions, $maxSess, $expiry ?: null, $phone]);
+
+        if ($isWalkin !== null) {
+            $db->prepare("UPDATE customers SET is_walkin = ? WHERE phone = ?")->execute([$isWalkin, $phone]);
+        }
 
         // Cập nhật mật khẩu nếu admin gửi new_password
         $newPw = $input['new_password'] ?? '';
@@ -349,9 +355,10 @@ switch ($action) {
         $ciStats->execute([$dateFrom, $dateTo]);
         $checkinStats = $ciStats->fetch();
 
-        // Check-in tách: combo (sở hữu gói combo) vs vãng lai (chỉ mua lẻ)
-        // Combo = khách có ít nhất 1 đơn combo đã thanh toán HOẶC được admin cộng gói combo
-        $ciCombo = $db->prepare("SELECT COUNT(*) as checkins, COALESCE(SUM(c.people_count),COUNT(*)) as people FROM checkins c WHERE DATE(c.checked_in_at) BETWEEN ? AND ? AND (c.phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR c.phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')))");
+        // Check-in tách: combo vs vãng lai
+        // Combo = khách có đơn combo HOẶC admin cộng gói combo, NHƯNG KHÔNG phải tài khoản khách lẻ
+        // Vãng lai = tài khoản khách lẻ (is_walkin=1) HOẶC khách chỉ mua lẻ
+        $ciCombo = $db->prepare("SELECT COUNT(*) as checkins, COALESCE(SUM(c.people_count),COUNT(*)) as people FROM checkins c WHERE DATE(c.checked_in_at) BETWEEN ? AND ? AND c.phone NOT IN (SELECT phone FROM customers WHERE is_walkin = 1) AND (c.phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR c.phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')))");
         $ciCombo->execute([$dateFrom, $dateTo]);
         $ciComboStats = $ciCombo->fetch();
         $ciWalk = [
@@ -359,9 +366,9 @@ switch ($action) {
             'people' => (int)$checkinStats['total_people'] - (int)$ciComboStats['people'],
         ];
 
-        // Lấy danh sách phone sở hữu combo (mua gói qua orders hoặc admin cộng)
+        // Lấy danh sách phone sở hữu combo (không tính tài khoản khách lẻ)
         $comboPhones = [];
-        $cpStmt = $db->query("SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') UNION SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')");
+        $cpStmt = $db->query("SELECT DISTINCT phone FROM (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids') UNION SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual')) combo WHERE phone NOT IN (SELECT phone FROM customers WHERE is_walkin = 1)");
         foreach ($cpStmt as $r) { $comboPhones[$r['phone']] = true; }
 
         // Danh sách check-in trong khoảng ngày
@@ -374,7 +381,7 @@ switch ($action) {
         }
 
         // 2. Hội viên còn dưới 5 buổi tập (chỉ khách sở hữu gói combo)
-        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND (phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual'))) ORDER BY sessions ASC")->fetchAll();
+        $lowMembers = $db->query("SELECT phone, name, sessions, max_sessions, expires_at FROM customers WHERE sessions > 0 AND sessions <= 5 AND is_walkin = 0 AND (phone IN (SELECT DISTINCT phone FROM orders WHERE payment_status='Paid' AND pkg_type NOT IN ('single','kids')) OR phone IN (SELECT DISTINCT phone FROM session_packages WHERE pkg NOT IN ('single','kids','manual'))) ORDER BY sessions ASC")->fetchAll();
 
         // 3. Doanh thu trong khoảng ngày
         $revRange = $db->prepare("SELECT COALESCE(SUM(amount),0) as revenue, COUNT(*) as paid_count FROM orders WHERE payment_status='Paid' AND DATE(paid_at) BETWEEN ? AND ?");
