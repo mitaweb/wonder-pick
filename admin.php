@@ -485,8 +485,10 @@
             <input type="date" id="sr-to" class="form-input" style="font-size:13px;width:140px">
             <button class="btn btn-primary" onclick="loadSalesReport()">Xem</button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">
-            <div class="stat-card"><div id="sr-revenue" class="stat-number" style="font-size:20px">—</div><div class="stat-label">Doanh thu</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+            <div class="stat-card"><div id="sr-revenue" class="stat-number" style="font-size:20px">—</div><div class="stat-label">Tổng doanh thu</div></div>
+            <div class="stat-card"><div id="sr-cash" class="stat-number" style="font-size:20px">—</div><div class="stat-label">💵 Tiền mặt</div></div>
+            <div class="stat-card"><div id="sr-transfer" class="stat-number" style="font-size:20px">—</div><div class="stat-label">🏦 Chuyển khoản</div></div>
             <div class="stat-card"><div id="sr-cost" class="stat-number" style="font-size:20px">—</div><div class="stat-label">Giá vốn</div></div>
             <div class="stat-card success"><div id="sr-profit" class="stat-number" style="font-size:20px">—</div><div class="stat-label">Lợi nhuận</div></div>
             <div class="stat-card"><div id="sr-orders" class="stat-number" style="font-size:20px">—</div><div class="stat-label">Số đơn</div></div>
@@ -502,10 +504,12 @@
           </div>
           <div class="table-card">
             <h3 style="font-size:14px;font-weight:500;margin-bottom:12px">Doanh thu theo ngày</h3>
-            <table class="data-table">
-              <thead><tr><th>Ngày</th><th>Doanh thu</th><th>Lợi nhuận</th><th>Đơn</th></tr></thead>
-              <tbody id="sr-daily-tbody"></tbody>
-            </table>
+            <div style="overflow-x:auto">
+              <table class="data-table" style="min-width:500px">
+                <thead><tr><th>Ngày</th><th>Doanh thu</th><th>💵 TM</th><th>🏦 CK</th><th>Lợi nhuận</th><th>Đơn</th></tr></thead>
+                <tbody id="sr-daily-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -2456,16 +2460,18 @@ async function loadSalesReport() {
     const res = await fetch(`${API_INV}?action=sales_report&from=${from}&to=${to}&admin_token=${adminToken}`);
     const json = await res.json();
     const s = json.summary||{};
-    document.getElementById('sr-revenue').textContent = formatMoney(s.revenue||0)+'đ';
-    document.getElementById('sr-cost').textContent    = formatMoney(s.cost||0)+'đ';
-    document.getElementById('sr-profit').textContent  = formatMoney(s.profit||0)+'đ';
-    document.getElementById('sr-orders').textContent  = s.total_orders||0;
+    document.getElementById('sr-revenue').textContent  = formatMoney(s.revenue||0)+'đ';
+    document.getElementById('sr-cash').textContent     = formatMoney(s.cash_revenue||0)+'đ';
+    document.getElementById('sr-transfer').textContent = formatMoney(s.transfer_revenue||0)+'đ';
+    document.getElementById('sr-cost').textContent     = formatMoney(s.cost||0)+'đ';
+    document.getElementById('sr-profit').textContent   = formatMoney(s.profit||0)+'đ';
+    document.getElementById('sr-orders').textContent   = (s.total_orders||0) + ` (${s.cash_orders||0} TM · ${s.transfer_orders||0} CK)`;
     const topTbody = document.getElementById('sr-top-tbody');
     topTbody.innerHTML = (json.top_products||[]).map(p=>`
       <tr><td>${esc(p.product_name)}</td><td>${p.total_qty}</td><td>${formatMoney(p.revenue)}đ</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text3)">Không có dữ liệu</td></tr>';
     const dailyTbody = document.getElementById('sr-daily-tbody');
     dailyTbody.innerHTML = (json.daily||[]).map(d=>`
-      <tr><td style="font-size:12px">${d.date}</td><td>${formatMoney(d.revenue)}đ</td><td style="color:var(--green)">${formatMoney(d.profit)}đ</td><td>${d.orders}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text3)">Không có dữ liệu</td></tr>';
+      <tr><td style="font-size:12px">${d.date}</td><td>${formatMoney(d.revenue)}đ</td><td>${formatMoney(d.cash_revenue||0)}đ</td><td>${formatMoney(d.transfer_revenue||0)}đ</td><td style="color:var(--green)">${formatMoney(d.profit)}đ</td><td>${d.orders}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Không có dữ liệu</td></tr>';
   } catch(e) { alert('Lỗi tải báo cáo'); }
 }
 

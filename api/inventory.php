@@ -258,7 +258,11 @@ switch ($action) {
             COUNT(*) AS total_orders,
             SUM(total_amount) AS revenue,
             SUM(total_cost) AS cost,
-            SUM(total_amount - total_cost) AS profit
+            SUM(total_amount - total_cost) AS profit,
+            SUM(CASE WHEN payment_method='cash' THEN total_amount ELSE 0 END) AS cash_revenue,
+            SUM(CASE WHEN payment_method='transfer' THEN total_amount ELSE 0 END) AS transfer_revenue,
+            SUM(CASE WHEN payment_method='cash' THEN 1 ELSE 0 END) AS cash_orders,
+            SUM(CASE WHEN payment_method='transfer' THEN 1 ELSE 0 END) AS transfer_orders
             FROM sales WHERE DATE(created_at) BETWEEN ? AND ?");
         $stmt->execute([$from, $to]);
         $summary = $stmt->fetch();
@@ -277,7 +281,9 @@ switch ($action) {
         $stmt3 = $db->prepare("SELECT DATE(created_at) AS date,
             SUM(total_amount) AS revenue,
             SUM(total_amount - total_cost) AS profit,
-            COUNT(*) AS orders
+            COUNT(*) AS orders,
+            SUM(CASE WHEN payment_method='cash' THEN total_amount ELSE 0 END) AS cash_revenue,
+            SUM(CASE WHEN payment_method='transfer' THEN total_amount ELSE 0 END) AS transfer_revenue
             FROM sales WHERE DATE(created_at) BETWEEN ? AND ?
             GROUP BY DATE(created_at) ORDER BY date DESC");
         $stmt3->execute([$from, $to]);
